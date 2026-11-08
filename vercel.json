@@ -34,14 +34,6 @@
     {
       "source": "/demo/",
       "destination": "/demo/index.html"
-    },
-    {
-      "source": "/mobile",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/mobile/",
-      "destination": "/index.html"
     }
   ]
 }
