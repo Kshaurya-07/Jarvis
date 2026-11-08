@@ -26,6 +26,14 @@
       <p>Only visible text from this active tab is read upon your click. Speech is transcribed locally via browser recognition; audio is never stored or sent externally.</p>
     </div>
 
+    <!-- Phase 10 Demo Mode Quick Launch -->
+    <div class="demo-banner">
+      <span class="demo-badge">Phase 10 Demo</span>
+      <a href="http://127.0.0.1:8000/demo/" target="_blank" id="open-demo-tab-btn" class="demo-link" title="Open local fictional science page in Chrome">
+        Launch Local Demo Tab (/demo/) &rarr;
+      </a>
+    </div>
+
     <!-- Mode Selector -->
     <div class="mode-selector">
       <label class="mode-option">
@@ -36,7 +44,65 @@
         <input type="radio" name="mode" value="quiz_help">
         <span>Practice Quiz Help</span>
       </label>
+      <label class="mode-option">
+        <input type="radio" name="mode" value="automation">
+        <span>Browser Automation</span>
+      </label>
     </div>
+
+    <!-- Phase 8: Browser Automation Controls (Visible in automation mode) -->
+    <div id="automation-panel" class="automation-panel hidden">
+      <div class="automation-domain-row">
+        <label for="approved-domain-select">Approved Domain:</label>
+        <div class="domain-input-group">
+          <select id="approved-domain-select" class="domain-select"></select>
+          <button id="approve-current-tab-btn" class="btn btn-small btn-secondary" title="Approve current active tab domain">Approve Tab Domain</button>
+        </div>
+      </div>
+
+      <div class="automation-action-selector">
+        <label>Select Automation Action:</label>
+        <div class="auto-action-options">
+          <label class="sub-mode-option">
+            <input type="radio" name="auto_action" value="read" checked>
+            <span>Read Page</span>
+          </label>
+          <label class="sub-mode-option">
+            <input type="radio" name="auto_action" value="fill">
+            <span>Fill Non-Sensitive Field</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="fill-field-inputs" class="fill-field-inputs hidden">
+        <input type="text" id="auto-selector" placeholder="CSS selector (e.g. #searchInput, input[name='q'])">
+        <input type="text" id="auto-value" placeholder="Non-sensitive text to fill">
+        <input type="text" id="auto-desc" placeholder="Field description (e.g. 'Search box')">
+      </div>
+
+      <!-- Action Confirmation Box (Shown before executing side-effect action) -->
+      <div id="automation-confirmation-box" class="confirmation-box hidden">
+        <h4>Confirmation Required</h4>
+        <p id="confirmation-desc-text" class="confirmation-desc"></p>
+        <div class="confirmation-warning">&#9888; The final submit button must be clicked by you manually; the agent cannot submit forms or make purchases.</div>
+        <div class="button-group-small">
+          <button id="auto-confirm-btn" class="btn btn-small btn-primary">Confirm & Run</button>
+          <button id="auto-deny-btn" class="btn btn-small btn-danger">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Action-by-Action Activity Log -->
+      <div class="activity-log-section">
+        <div class="activity-log-header">
+          <span>Action Activity Log</span>
+          <button id="clear-activity-log-btn" class="btn-text">Clear</button>
+        </div>
+        <div id="activity-log-list" class="activity-log-list">
+          <div class="log-empty">No browser actions executed yet.</div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Voice Push-to-Talk Section -->
     <div class="voice-section">

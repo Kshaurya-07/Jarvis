@@ -173,7 +173,7 @@ def test_rule_no_quiz_click_or_submit_tool_exists():
         for forbidden in forbidden_terms:
             assert forbidden not in name, f"Forbidden automated quiz tool detected: {name}"
 
-    # Only approved Phase 1-5 tools are registered
+    # Only approved Phase 1-8 tools are registered
     approved_tools = {
         "list_files",
         "read_text_file",
@@ -194,5 +194,12 @@ def test_rule_no_quiz_click_or_submit_tool_exists():
         "list_memories",
         "web_search",
         "get_daily_briefing",
+        "list_gmail_messages",
+        "summarize_gmail_messages",
+        "list_calendar_events",
+        "summarize_calendar_events",
+        "browser_navigate",
+        "browser_read_page",
+        "browser_fill_field",
     }
     assert set(tool_names) == approved_tools

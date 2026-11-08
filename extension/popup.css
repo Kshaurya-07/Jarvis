@@ -116,6 +116,41 @@ h2 {
   line-height: 1;
 }
 
+/* Phase 10 Demo Banner */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.demo-badge {
+  background-color: #6366f1;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.demo-link {
+  color: #a5b4fc;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.demo-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
 /* Mode selector */
 .mode-selector {
   display: flex;
@@ -446,6 +481,164 @@ textarea:focus {
   font-size: 10px;
   border-top: 1px solid var(--border-color);
   padding-top: 8px;
+}
+
+/* Phase 8: Automation Panel Styles */
+.automation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.automation-domain-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.automation-domain-row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.domain-input-group {
+  display: flex;
+  gap: 6px;
+}
+
+.domain-select {
+  flex: 1;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.auto-action-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sub-mode-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.fill-field-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fill-field-inputs input {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.confirmation-box {
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.confirmation-box h4 {
+  font-size: 12px;
+  color: #fbbf24;
+}
+
+.confirmation-desc {
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.confirmation-warning {
+  font-size: 10px;
+  color: #fde68a;
+  line-height: 1.35;
+}
+
+.button-group-small {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.activity-log-section {
+  border-top: 1px solid var(--border-color);
+  padding-top: 8px;
+}
+
+.activity-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.activity-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.activity-log-item {
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  border-left: 3px solid var(--accent-primary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.activity-log-item.success {
+  border-left-color: var(--accent-success);
+}
+
+.activity-log-item.failure {
+  border-left-color: var(--accent-danger);
+}
+
+.log-empty {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 6px 0;
 }
 
 .hidden {

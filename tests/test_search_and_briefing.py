@@ -172,10 +172,22 @@ def test_briefing_api_endpoint(client):
     assert "Attribution:" in data["attribution"]
 
 
-def test_rule_no_gmail_or_calendar_tools_in_phase5():
-    """Verify that no Gmail or Google Calendar tools exist in Phase 5."""
+def test_rule_no_write_gmail_or_calendar_tools():
+    """Verify that only read-only Gmail and Calendar tools exist (no send, delete, create, or update)."""
     all_tools = [t.name.lower() for t in tool_registry.get_all_tools()]
-    forbidden = ["gmail", "email", "calendar", "google_calendar", "schedule_email"]
+    forbidden_write = [
+        "send_gmail",
+        "send_email",
+        "delete_gmail",
+        "delete_email",
+        "archive_email",
+        "trash_email",
+        "mark_read",
+        "create_event",
+        "update_event",
+        "delete_event",
+        "edit_event",
+    ]
     for t in all_tools:
-        for f in forbidden:
-            assert f not in t, f"Forbidden tool detected: {t}"
+        for f in forbidden_write:
+            assert f not in t, f"Forbidden write tool detected: {t}"

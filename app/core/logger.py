@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -13,6 +14,25 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 app_logger = logging.getLogger("jarvis")
+
+# Sensitive data redaction patterns for audit log entries
+REDACTION_PATTERNS = [
+    (re.compile(r"(?i)(?:password|passwd|pwd|secret|token|api_key)\s*[:=]\s*\S+"), "[REDACTED_SECRET]"),
+    (re.compile(r"(?:AIza[0-9A-Za-z-_]{35}|sk-[a-zA-Z0-9]{20,}|gh[pousr]_[a-zA-Z0-9]{20,}|tvly-[a-zA-Z0-9_-]+)"), "[REDACTED_KEY]"),
+    (re.compile(r"(?i)bearer\s+[a-zA-Z0-9_\-\.]+"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[REDACTED_EMAIL]"),
+    (re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"), "[REDACTED_CARD]"),
+]
+
+
+def scrub_sensitive_text(text: str) -> str:
+    """Scrub sensitive credentials, tokens, card numbers, and emails from log strings."""
+    if not text:
+        return ""
+    scrubbed = text
+    for pattern, replacement in REDACTION_PATTERNS:
+        scrubbed = pattern.sub(replacement, scrubbed)
+    return scrubbed
 
 
 class ActionLogEntry(BaseModel):
@@ -48,8 +68,9 @@ class ActionLogger:
         # Ensure details do not leak excessive length or potential secrets
         safe_details = None
         if details:
+            scrubbed = scrub_sensitive_text(str(details))
             # Truncate details if overly long
-            safe_details = details[:300] if len(details) > 300 else details
+            safe_details = scrubbed[:300] if len(scrubbed) > 300 else scrubbed
 
         entry = ActionLogEntry(
             tool_name=tool_name,

@@ -1,6 +1,6 @@
 import sys
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app import __version__
 from app.api.schemas import (
@@ -20,9 +20,51 @@ from app.api.schemas import (
     MemoryResponse,
     MemoryStatusResponse,
     MemoryToggleRequest,
+    GoogleAuthUrlResponse,
+    GoogleAuthStatusResponse,
+    GoogleDisconnectResponse,
+    GmailListResponse,
+    GmailSummarizeRequest,
+    GmailSummarizeResponse,
+    CalendarListResponse,
+    CalendarSummarizeRequest,
+    CalendarSummarizeResponse,
+    ApprovedDomainsResponse,
+    ApproveDomainRequest,
+    BrowserPlanActionRequest,
+    BrowserPlanActionResponse,
+    DataLocationsResponse,
+    DataExportResponse,
+    DataClearRequest,
+    DataClearResponse,
+    BackupCreateRequest,
+    BackupCreateResponse,
+    BackupRestoreRequest,
+    BackupRestoreResponse,
+    BackupListResponse,
+    DemoStatusResponse,
+    DemoActionResponse,
 )
 from app.core.config import settings
 from app.core.confirmation import confirmation_manager
+from app.core.data_manager import user_data_manager
+from app.core.demo_manager import demo_manager
+from app.core.rate_limiter import auth_rate_limiter
+from app.core.browser_automation import (
+    browser_manager,
+    validate_approved_url,
+    is_sensitive_field,
+    check_forbidden_action,
+    BrowserSecurityViolation,
+    DomainSecurityViolation,
+)
+from app.core.google_auth import (
+    google_auth_manager,
+    GoogleConfigError,
+    GoogleAuthError,
+    GoogleAuthRequiredError,
+    GoogleTokenRevokedError,
+)
 from app.core.logger import action_logger, ActionLogEntry
 from app.services.agent_service import agent_service
 from app.services.extension_service import extension_service
@@ -30,6 +72,13 @@ from app.tools.registry import tool_registry
 from app.tools.reminders_tools import reminders_storage, delete_reminder
 from app.tools.memory_tools import memory_storage, detect_sensitive_data
 from app.tools.briefing_tools import build_daily_briefing
+from app.tools.gmail_tools import list_gmail_messages, summarize_gmail_messages
+from app.tools.calendar_tools import list_calendar_events, summarize_calendar_events
+from app.tools.browser_automation_tools import (
+    browser_navigate,
+    browser_read_page,
+    browser_fill_field,
+)
 
 router = APIRouter()
 
@@ -54,6 +103,7 @@ async def health_check() -> HealthResponse:
         reminders_count=rem_count,
         memories_count=mem_count,
         memory_enabled=settings.MEMORY_ENABLED,
+        google_connected=google_auth_manager.is_connected(),
         active_tools=tools,
     )
 
@@ -131,11 +181,14 @@ async def get_pending_confirmations() -> List[PendingActionInfo]:
 
 
 @router.post("/confirm", response_model=ConfirmationResponse, tags=["Confirmation"])
-async def confirm_action(req: ConfirmationRequest) -> ConfirmationResponse:
+async def confirm_action(req: ConfirmationRequest, request: Request) -> ConfirmationResponse:
     """
     Explicitly approve or deny a pending action requiring confirmation.
     If approved, executes the tool safely and returns the output.
+    Rate-limited against brute-force token enumeration.
     """
+    auth_rate_limiter.check_request(request)
+
     if not req.approve:
         denied = confirmation_manager.deny_action(req.confirmation_id)
         if denied:
@@ -144,6 +197,7 @@ async def confirm_action(req: ConfirmationRequest) -> ConfirmationResponse:
                 message=f"Action '{req.confirmation_id}' has been denied and cancelled.",
             )
         else:
+            auth_rate_limiter.record_failure(request)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Pending action '{req.confirmation_id}' not found or already expired.",
@@ -152,6 +206,7 @@ async def confirm_action(req: ConfirmationRequest) -> ConfirmationResponse:
     # Approve
     action = confirmation_manager.confirm_action(req.confirmation_id)
     if not action:
+        auth_rate_limiter.record_failure(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Pending action '{req.confirmation_id}' not found or expired.",
@@ -389,3 +444,431 @@ async def get_briefing_endpoint(
             detail=result.error,
         )
     return result.output
+
+
+# --- Phase 6: Google OAuth, Gmail & Google Calendar Endpoints ---
+
+@router.get("/auth/google/url", response_model=GoogleAuthUrlResponse, tags=["Google Auth"])
+async def get_google_auth_url(redirect_uri: Optional[str] = Query(None)) -> GoogleAuthUrlResponse:
+    """
+    Generate a Google OAuth 2.0 authorization URL using PKCE (S256) and anti-CSRF state.
+    User visits this URL in a browser to grant read-only Gmail and Calendar permissions.
+    """
+    try:
+        auth_url, state = google_auth_manager.create_authorization_url(redirect_uri=redirect_uri)
+        return GoogleAuthUrlResponse(
+            auth_url=auth_url,
+            state=state,
+            scopes=settings.GOOGLE_OAUTH_SCOPES,
+        )
+    except GoogleConfigError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create auth URL: {e}")
+
+
+@router.get("/auth/google/callback", tags=["Google Auth"])
+async def google_auth_callback(
+    request: Request,
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+):
+    """
+    OAuth 2.0 redirect callback endpoint.
+    Verifies state token, exchanges code for tokens via PKCE, and stores refresh token securely.
+    Rate-limited against brute-force state/code manipulation.
+    """
+    auth_rate_limiter.check_request(request)
+
+    if error:
+        auth_rate_limiter.record_failure(request)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google authorization error returned: {error}",
+        )
+    if not code or not state:
+        auth_rate_limiter.record_failure(request)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required 'code' or 'state' parameter in OAuth callback.",
+        )
+
+    try:
+        result = google_auth_manager.exchange_code(code=code, state=state)
+        return {
+            "status": "connected",
+            "message": "Google account successfully connected with read-only Gmail and Calendar access.",
+            "account_email": result.get("account_email"),
+            "storage_backend": result.get("storage_backend"),
+            "scopes": result.get("scopes"),
+        }
+    except GoogleAuthError as e:
+        auth_rate_limiter.record_failure(request)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except RuntimeError as e:
+        auth_rate_limiter.record_failure(request)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    except Exception as e:
+        auth_rate_limiter.record_failure(request)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"OAuth exchange failed: {e}")
+
+
+@router.post("/auth/google/disconnect", response_model=GoogleDisconnectResponse, tags=["Google Auth"])
+async def disconnect_google() -> GoogleDisconnectResponse:
+    """
+    Disconnect Google account: revokes tokens with Google and erases local credentials.
+    """
+    res = google_auth_manager.disconnect()
+    return GoogleDisconnectResponse(
+        status=res.get("status", "disconnected"),
+        message=res.get("message", "Google account disconnected."),
+        revoked_remotely=res.get("revoked_remotely", False),
+    )
+
+
+@router.get("/auth/google/status", response_model=GoogleAuthStatusResponse, tags=["Google Auth"])
+async def get_google_status() -> GoogleAuthStatusResponse:
+    """
+    Check current Google account connection status and storage backend.
+    """
+    st = google_auth_manager.get_status()
+    return GoogleAuthStatusResponse(
+        connected=st["connected"],
+        account_email=st.get("account_email"),
+        scopes=st.get("scopes", []),
+        storage_backend=st.get("storage_backend", "Unknown"),
+        connected_at=st.get("connected_at"),
+        read_only=st.get("read_only", True),
+    )
+
+
+@router.get("/gmail/messages", response_model=GmailListResponse, tags=["Gmail"])
+async def list_gmail_messages_endpoint(
+    max_results: int = Query(5, ge=1, le=20, description="Max messages to retrieve."),
+    query: Optional[str] = Query(None, max_length=150, description="Optional search filter."),
+) -> GmailListResponse:
+    """
+    List recent Gmail messages with metadata (Sender, Subject, Date, Snippet).
+    Strictly read-only.
+    """
+    res = list_gmail_messages(max_results=max_results, query=query)
+    if not res.success:
+        status_code = status.HTTP_400_BAD_REQUEST if "not connected" in res.error.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(status_code=status_code, detail=res.error)
+
+    output = res.output
+    return GmailListResponse(
+        count=output["count"],
+        messages=output["messages"],
+        filter_query=output.get("filter_query"),
+        read_only=True,
+    )
+
+
+@router.post("/gmail/summarize", response_model=GmailSummarizeResponse, tags=["Gmail"])
+async def summarize_gmail_endpoint(req: GmailSummarizeRequest) -> GmailSummarizeResponse:
+    """
+    Summarize selected or recent Gmail messages using Gemini.
+    Discloses that email text is sent to Gemini. Never stores email bodies in memory or logs.
+    """
+    res = summarize_gmail_messages(
+        message_ids=req.message_ids,
+        max_results=req.max_results,
+        query=req.query,
+        custom_instructions=req.custom_instructions,
+    )
+    if not res.success:
+        status_code = status.HTTP_400_BAD_REQUEST if "not connected" in res.error.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(status_code=status_code, detail=res.error)
+
+    output = res.output
+    return GmailSummarizeResponse(
+        count=output["count"],
+        summary=output["summary"],
+        analyzed_messages=output.get("analyzed_messages"),
+        disclosure=output["disclosure"],
+        read_only=True,
+    )
+
+
+@router.get("/calendar/events", response_model=CalendarListResponse, tags=["Calendar"])
+async def list_calendar_events_endpoint(
+    time_min: Optional[str] = Query(None, description="Start datetime in ISO 8601."),
+    time_max: Optional[str] = Query(None, description="End datetime in ISO 8601."),
+    max_results: int = Query(10, ge=1, le=25, description="Max events to retrieve."),
+    calendar_id: str = Query("primary", description="Calendar identifier."),
+) -> CalendarListResponse:
+    """
+    List upcoming Google Calendar events for a date range.
+    Strictly read-only.
+    """
+    res = list_calendar_events(
+        time_min=time_min,
+        time_max=time_max,
+        max_results=max_results,
+        calendar_id=calendar_id,
+    )
+    if not res.success:
+        status_code = status.HTTP_400_BAD_REQUEST if ("not connected" in res.error.lower() or "invalid" in res.error.lower()) else status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(status_code=status_code, detail=res.error)
+
+    output = res.output
+    return CalendarListResponse(
+        count=output["count"],
+        events=output["events"],
+        time_min=output["time_min"],
+        time_max=output["time_max"],
+        read_only=True,
+    )
+
+
+@router.post("/calendar/summarize", response_model=CalendarSummarizeResponse, tags=["Calendar"])
+async def summarize_calendar_endpoint(req: CalendarSummarizeRequest) -> CalendarSummarizeResponse:
+    """
+    Summarize Google Calendar events across a date range using Gemini.
+    Discloses that event details are sent to Gemini. Never stores event titles in memory or logs.
+    """
+    res = summarize_calendar_events(
+        time_min=req.time_min,
+        time_max=req.time_max,
+        calendar_id=req.calendar_id,
+    )
+    if not res.success:
+        status_code = status.HTTP_400_BAD_REQUEST if "not connected" in res.error.lower() else status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(status_code=status_code, detail=res.error)
+
+    output = res.output
+    return CalendarSummarizeResponse(
+        count=output["count"],
+        summary=output["summary"],
+        disclosure=output["disclosure"],
+        time_min=output.get("time_min"),
+        time_max=output.get("time_max"),
+        read_only=True,
+    )
+
+
+# --- Phase 8: Limited Browser Automation Endpoints ---
+
+@router.get("/browser/approved-domains", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
+async def get_approved_domains() -> ApprovedDomainsResponse:
+    """Get the current list of user-approved domains for browser automation."""
+    return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains())
+
+
+@router.post("/browser/approve-domain", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
+async def approve_domain_endpoint(req: ApproveDomainRequest) -> ApprovedDomainsResponse:
+    """Explicitly approve a domain for browser automation."""
+    try:
+        browser_manager.approve_domain(req.domain)
+        return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains())
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/browser/plan-action", response_model=BrowserPlanActionResponse, tags=["Browser Automation"])
+async def plan_browser_action(req: BrowserPlanActionRequest) -> BrowserPlanActionResponse:
+    """
+    Validate and stage a low-risk browser action.
+    Enforces domain restrictions, sensitive-field exclusion, and forbidden action rules.
+    If action causes state changes, returns a confirmation_id requiring user approval.
+    """
+    act = req.action_type.strip().lower()
+
+    # 1. Validate domain
+    if not browser_manager.is_approved(req.approved_domain):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Domain '{req.approved_domain}' is not approved. Please approve this domain "
+                f"first via the extension or /api/browser/approve-domain."
+            ),
+        )
+
+    # 2. Validate action specifics
+    if act == "navigate":
+        if not req.url:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Argument 'url' is required for navigation.")
+        try:
+            clean_url = validate_approved_url(req.url, req.approved_domain)
+        except DomainSecurityViolation as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+        desc = f"Navigate browser to '{clean_url}' within approved domain '{req.approved_domain}'"
+        pending = confirmation_manager.create_pending_action(
+            tool_name="browser_navigate",
+            arguments={"url": clean_url, "approved_domain": req.approved_domain},
+            description=desc,
+        )
+        return BrowserPlanActionResponse(
+            allowed=True,
+            action_type="navigate",
+            approved_domain=req.approved_domain,
+            requires_confirmation=True,
+            confirmation_id=pending.confirmation_id,
+            description=desc,
+        )
+
+    elif act == "fill_field":
+        if not req.selector:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Argument 'selector' is required for fill_field.")
+        if req.value is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Argument 'value' is required for fill_field.")
+
+        # Check sensitive field
+        if is_sensitive_field(selector=req.selector, label_or_desc=req.field_description):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Security Refusal: Field '{req.selector}' is sensitive (password, card, or auth). Cannot automate.",
+            )
+
+        # Check forbidden submit/purchase
+        try:
+            check_forbidden_action("fill_field", target_selector=req.selector, description=req.field_description)
+        except BrowserSecurityViolation as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+        # Check sensitive value
+        sensitive_reason = detect_sensitive_data(req.value)
+        if sensitive_reason:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Privacy Refusal: Proposed value contains sensitive credentials ({sensitive_reason}). Cannot automate.",
+            )
+
+        desc = f"Fill field '{req.field_description or req.selector}' on approved domain '{req.approved_domain}'. (Manual submit required)"
+        pending = confirmation_manager.create_pending_action(
+            tool_name="browser_fill_field",
+            arguments={
+                "selector": req.selector.strip(),
+                "value": req.value,
+                "approved_domain": req.approved_domain,
+            },
+            description=desc,
+        )
+        return BrowserPlanActionResponse(
+            allowed=True,
+            action_type="fill_field",
+            approved_domain=req.approved_domain,
+            requires_confirmation=True,
+            confirmation_id=pending.confirmation_id,
+            description=desc,
+            warning="Notice: The final submit button must be clicked manually by you; the agent does not submit forms.",
+        )
+
+    elif act == "read_page":
+        if req.url:
+            try:
+                validate_approved_url(req.url, req.approved_domain)
+            except DomainSecurityViolation as e:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+        return BrowserPlanActionResponse(
+            allowed=True,
+            action_type="read_page",
+            approved_domain=req.approved_domain,
+            requires_confirmation=False,
+            description="Read visible text from approved page. Page text is treated as untrusted reference data.",
+        )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported browser action '{req.action_type}'. Approved actions: navigate, read_page, fill_field.",
+        )
+
+
+# --- Phase 9: User Data Controls, Backup & Recovery Endpoints ---
+
+@router.get("/data/locations", response_model=DataLocationsResponse, tags=["Data Management"])
+async def get_data_locations_endpoint() -> DataLocationsResponse:
+    """View all local filesystem paths where user data is stored."""
+    locs = user_data_manager.get_data_locations()
+    return DataLocationsResponse(**locs)
+
+
+@router.get("/data/export", response_model=DataExportResponse, tags=["Data Management"])
+async def export_user_data_endpoint() -> DataExportResponse:
+    """
+    Export all user-owned notes, memories, and reminders in clean JSON format.
+    Strictly excludes secrets, API keys, and credentials.
+    """
+    data = user_data_manager.export_user_data()
+    return DataExportResponse(**data)
+
+
+@router.post("/data/clear", response_model=DataClearResponse, tags=["Data Management"])
+async def clear_all_data_endpoint(req: DataClearRequest) -> DataClearResponse:
+    """
+    Permanently wipe all user notes, memories, reminders, and screenshot images.
+    Requires confirm=true and confirmation_text='DELETE ALL DATA'.
+    """
+    try:
+        res = user_data_manager.clear_all_local_data(
+            confirm=req.confirm,
+            confirmation_text=req.confirmation_text,
+        )
+        return DataClearResponse(**res)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/data/backups", response_model=BackupListResponse, tags=["Data Management"])
+async def list_backups_endpoint() -> BackupListResponse:
+    """List all available local backup snapshots with verification status."""
+    backups = user_data_manager.list_backups()
+    return BackupListResponse(count=len(backups), backups=backups)
+
+
+@router.post("/data/backup", response_model=BackupCreateResponse, tags=["Data Management"])
+async def create_backup_endpoint(req: BackupCreateRequest = BackupCreateRequest()) -> BackupCreateResponse:
+    """
+    Create a local validated backup snapshot of notes, reminders, and memories
+    with a SHA-256 integrity checksum. Does NOT include secrets or credentials.
+    """
+    res = user_data_manager.create_backup(backup_name=req.backup_name)
+    return BackupCreateResponse(**res)
+
+
+@router.post("/data/restore", response_model=BackupRestoreResponse, tags=["Data Management"])
+async def restore_backup_endpoint(req: BackupRestoreRequest) -> BackupRestoreResponse:
+    """
+    Safely restore user data from a local backup file after checksum validation.
+    Requires confirm_overwrite=true if existing data is present.
+    """
+    try:
+        res = user_data_manager.restore_backup(
+            backup_filename=req.backup_filename,
+            confirm_overwrite=req.confirm_overwrite,
+        )
+        return BackupRestoreResponse(**res)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Restore failed: {e}")
+
+
+# --- Phase 10: End-to-End Demo Mode Endpoints ---
+
+@router.get("/demo/status", response_model=DemoStatusResponse, tags=["Demo"])
+async def get_demo_status_endpoint() -> DemoStatusResponse:
+    """Returns the current status, links, and step-by-step instructions for Phase 10 Demo."""
+    st = demo_manager.get_status()
+    return DemoStatusResponse(**st)
+
+
+@router.post("/demo/seed", response_model=DemoActionResponse, tags=["Demo"])
+async def seed_demo_data_endpoint() -> DemoActionResponse:
+    """Seeds fictional mock notes, reminders, and memory tagged with '[DEMO]'."""
+    res = demo_manager.seed_demo_data()
+    return DemoActionResponse(**res)
+
+
+@router.post("/demo/reset", response_model=DemoActionResponse, tags=["Demo"])
+async def clear_demo_data_endpoint() -> DemoActionResponse:
+    """One-step deletion of mock/demo data without touching real user files or records."""
+    res = demo_manager.clear_demo_data()
+    return DemoActionResponse(**res)
+
+

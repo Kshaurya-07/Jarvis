@@ -78,6 +78,12 @@ def resolve_safe_path(
     if "\0" in user_path:
         raise SecurityViolationError("Path contains prohibited null bytes.")
 
+    # Prohibit Windows Alternate Data Streams (ADS) and malformed colon syntax
+    if ":" in user_path:
+        # Only allow standard single drive letter at start (e.g. "C:\...") for absolute paths
+        if not (len(user_path) >= 2 and user_path[1] == ":" and user_path[0].isalpha() and ":" not in user_path[2:]):
+            raise SecurityViolationError("Path contains prohibited colon or alternate data stream indicator.")
+
     # Convert to pure path for component inspection
     path_obj = Path(user_path)
 
@@ -90,10 +96,8 @@ def resolve_safe_path(
     else:
         resolved = (base_canonical / path_obj).resolve()
 
-    # Critical boundary check: must be inside base_canonical
-    try:
-        resolved.relative_to(base_canonical)
-    except ValueError:
+    # Critical boundary check: must be inside base_canonical (blocks traversal and symlink escapes)
+    if not resolved.is_relative_to(base_canonical):
         raise SecurityViolationError(
             f"Access denied: Path '{user_path}' escapes the restricted boundary."
         )

@@ -44,6 +44,7 @@ class HealthResponse(BaseModel):
     reminders_count: int = 0
     memories_count: int = 0
     memory_enabled: bool = True
+    google_connected: bool = False
     active_tools: List[str]
 
 
@@ -165,3 +166,220 @@ class DailyBriefingResponse(BaseModel):
     web_overview: Optional[Dict[str, Any]] = None
     attribution: str
     formatting_instructions: str
+
+
+# --- Phase 6 Schemas (Google OAuth, Gmail & Calendar) ---
+
+class GoogleAuthUrlResponse(BaseModel):
+    """Response containing Google OAuth authorization URL and state token."""
+    auth_url: str
+    state: str
+    scopes: List[str]
+
+
+class GoogleAuthStatusResponse(BaseModel):
+    """Google OAuth connection status and storage backend metadata."""
+    connected: bool
+    account_email: Optional[str] = None
+    scopes: List[str]
+    storage_backend: str
+    connected_at: Optional[str] = None
+    read_only: bool = True
+
+
+class GoogleDisconnectResponse(BaseModel):
+    """Response from disconnecting and revoking Google OAuth account."""
+    status: str
+    message: str
+    revoked_remotely: bool
+    revocation_guide: str = (
+        "Tokens have been deleted from local storage. To review or manually revoke Jarvis "
+        "permissions from your Google Account at any time, visit: https://myaccount.google.com/permissions"
+    )
+
+
+class GmailListResponse(BaseModel):
+    """Response from listing recent Gmail messages."""
+    count: int
+    messages: List[Dict[str, Any]]
+    filter_query: Optional[str] = None
+    read_only: bool = True
+
+
+class GmailSummarizeRequest(BaseModel):
+    """Request payload to summarize Gmail messages."""
+    message_ids: Optional[List[str]] = None
+    max_results: int = 3
+    query: Optional[str] = None
+    custom_instructions: Optional[str] = None
+
+
+class GmailSummarizeResponse(BaseModel):
+    """Response containing Gemini summary of email messages."""
+    count: int
+    summary: str
+    analyzed_messages: Optional[List[Dict[str, Any]]] = None
+    disclosure: str
+    read_only: bool = True
+
+
+class CalendarListResponse(BaseModel):
+    """Response from listing Google Calendar events."""
+    count: int
+    events: List[Dict[str, Any]]
+    time_min: str
+    time_max: str
+    read_only: bool = True
+
+
+class CalendarSummarizeRequest(BaseModel):
+    """Request payload to summarize calendar events for a date range."""
+    time_min: Optional[str] = None
+    time_max: Optional[str] = None
+    calendar_id: str = "primary"
+
+
+class CalendarSummarizeResponse(BaseModel):
+    """Response containing Gemini summary of calendar events."""
+    count: int
+    summary: str
+    disclosure: str
+    time_min: Optional[str] = None
+    time_max: Optional[str] = None
+    read_only: bool = True
+
+
+# --- Phase 8 Schemas (Limited Browser Automation) ---
+
+class ApprovedDomainsResponse(BaseModel):
+    """List of user-approved domains for browser automation."""
+    approved_domains: List[str]
+
+
+class ApproveDomainRequest(BaseModel):
+    """Request payload to add a domain to the user-approved list."""
+    domain: str = Field(..., min_length=3, max_length=150, description="Domain to approve, e.g. 'wikipedia.org'.")
+
+
+class BrowserPlanActionRequest(BaseModel):
+    """Payload to validate and plan a low-risk browser action."""
+    action_type: str = Field(..., description="'navigate', 'read_page', or 'fill_field'")
+    approved_domain: str = Field(..., description="The user-approved domain.")
+    url: Optional[str] = Field(None, description="Target URL for navigation or reading.")
+    selector: Optional[str] = Field(None, description="CSS selector for target field.")
+    value: Optional[str] = Field(None, description="Non-sensitive value to fill.")
+    field_description: Optional[str] = Field(None, description="Human description of target field.")
+
+
+class BrowserPlanActionResponse(BaseModel):
+    """Response from planning a browser action with safety validation & confirmation."""
+    allowed: bool
+    action_type: str
+    approved_domain: str
+    requires_confirmation: bool
+    confirmation_id: Optional[str] = None
+    description: Optional[str] = None
+    warning: Optional[str] = None
+    error: Optional[str] = None
+
+
+# --- Phase 9 Schemas (User Data Controls, Backup & Recovery) ---
+
+class DataLocationsResponse(BaseModel):
+    """Information on local filesystem data storage locations."""
+    locations: Dict[str, Any]
+    oauth_storage: Dict[str, Any]
+    disclosure: str
+
+
+class DataExportResponse(BaseModel):
+    """User data export containing notes, reminders, and memories."""
+    export_format_version: str
+    exported_at: str
+    app_version: str
+    data: Dict[str, Any]
+    summary: Dict[str, int]
+    privacy_notice: str
+
+
+class DataClearRequest(BaseModel):
+    """Payload to confirm clearing all local user data."""
+    confirm: bool = Field(..., description="Must be true to authorize deletion.")
+    confirmation_text: str = Field(..., description="Must exactly match 'DELETE ALL DATA'.")
+
+
+class DataClearResponse(BaseModel):
+    """Response confirming deletion of user data."""
+    status: str
+    message: str
+    deleted_items: Dict[str, int]
+    timestamp: str
+
+
+class BackupCreateRequest(BaseModel):
+    """Optional payload to create a named local backup."""
+    backup_name: Optional[str] = Field(None, max_length=50, description="Optional custom name for backup file.")
+
+
+class BackupCreateResponse(BaseModel):
+    """Response confirming backup creation with integrity checksum."""
+    status: str
+    backup_filename: str
+    backup_path: str
+    created_at: str
+    checksum: str
+    summary: Dict[str, int]
+
+
+class BackupRestoreRequest(BaseModel):
+    """Payload to restore data from a validated local backup."""
+    backup_filename: str = Field(..., description="Name of the backup file in backups/ to restore.")
+    confirm_overwrite: bool = Field(False, description="Must be true to authorize overwriting existing local data.")
+
+
+class BackupRestoreResponse(BaseModel):
+    """Response confirming restoration of data from backup."""
+    status: str
+    message: str
+    restored_items: Dict[str, int]
+    timestamp: str
+
+
+class BackupListResponse(BaseModel):
+    """List of all local backup files with verification status."""
+    count: int
+    backups: List[Dict[str, Any]]
+
+
+# --- Phase 10 Schemas (End-to-End Demo Mode) ---
+
+class DemoStepInfo(BaseModel):
+    step: int
+    title: str
+    description: str
+
+
+class DemoStatusResponse(BaseModel):
+    """Status and instructions for the Phase 10 local end-to-end demo."""
+    demo_version: str
+    app_version: str
+    backend_connected: bool
+    gemini_configured: bool
+    demo_page_url: str
+    companion_url: str
+    active_demo_data: Dict[str, int]
+    steps: List[DemoStepInfo]
+    safety_guarantee: str
+
+
+class DemoActionResponse(BaseModel):
+    """Response from seeding or clearing mock demo data."""
+    status: str
+    message: str
+    seeded_items: Optional[Dict[str, int]] = None
+    deleted_items: Optional[Dict[str, int]] = None
+    note_file: Optional[str] = None
+
+
+
+

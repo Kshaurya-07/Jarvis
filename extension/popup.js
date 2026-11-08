@@ -321,7 +321,290 @@ function hideError() {
   errorMessage.textContent = "";
 }
 
-// Event Listeners
+// Phase 8: Automation DOM Elements
+const automationPanel = document.getElementById("automation-panel");
+const approvedDomainSelect = document.getElementById("approved-domain-select");
+const approveCurrentTabBtn = document.getElementById("approve-current-tab-btn");
+const autoActionRadios = document.querySelectorAll("input[name='auto_action']");
+const fillFieldInputs = document.getElementById("fill-field-inputs");
+const autoSelectorInput = document.getElementById("auto-selector");
+const autoValueInput = document.getElementById("auto-value");
+const autoDescInput = document.getElementById("auto-desc");
+const autoConfirmationBox = document.getElementById("automation-confirmation-box");
+const confirmationDescText = document.getElementById("confirmation-desc-text");
+const autoConfirmBtn = document.getElementById("auto-confirm-btn");
+const autoDenyBtn = document.getElementById("auto-deny-btn");
+const activityLogList = document.getElementById("activity-log-list");
+const clearActivityLogBtn = document.getElementById("clear-activity-log-btn");
+
+let pendingAutomationAction = null;
+
+// Handle Mode Change
+document.querySelectorAll("input[name='mode']").forEach(radio => {
+  radio.addEventListener("change", (e) => {
+    if (e.target.value === "automation") {
+      automationPanel.classList.remove("hidden");
+      readBtn.innerHTML = '<span class="btn-icon">&#9658;</span> Execute Action';
+      loadApprovedDomains();
+    } else {
+      automationPanel.classList.add("hidden");
+      readBtn.innerHTML = '<span class="btn-icon">&#128214;</span> Read This Page';
+    }
+  });
+});
+
+// Handle Automation Action Sub-mode (read vs fill)
+autoActionRadios.forEach(radio => {
+  radio.addEventListener("change", (e) => {
+    if (e.target.value === "fill") {
+      fillFieldInputs.classList.remove("hidden");
+    } else {
+      fillFieldInputs.classList.add("hidden");
+    }
+  });
+});
+
+// Load Approved Domains from Backend
+async function loadApprovedDomains() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/browser/approved-domains`);
+    if (res.ok) {
+      const data = await res.json();
+      approvedDomainSelect.innerHTML = "";
+      data.approved_domains.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d;
+        opt.textContent = d;
+        approvedDomainSelect.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    console.debug("Could not load approved domains:", e);
+  }
+}
+
+// Approve Current Active Tab Domain
+if (approveCurrentTabBtn) {
+  approveCurrentTabBtn.addEventListener("click", async () => {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs || !tabs[0] || !tabs[0].url) return;
+      const url = new URL(tabs[0].url);
+      const domain = url.hostname;
+
+      const res = await fetch(`${BACKEND_URL}/api/browser/approve-domain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain }),
+      });
+      if (res.ok) {
+        await loadApprovedDomains();
+        approvedDomainSelect.value = domain;
+        logActivity("APPROVE_DOMAIN", domain, "success");
+      }
+    } catch (e) {
+      showError("Failed to approve domain: " + e.message);
+    }
+  });
+}
+
+// Activity Log helpers
+function logActivity(action, domain, status) {
+  const emptyMsg = activityLogList.querySelector(".log-empty");
+  if (emptyMsg) emptyMsg.remove();
+
+  const item = document.createElement("div");
+  item.className = `activity-log-item ${status}`;
+  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  item.innerHTML = `<span><strong>${action}</strong>: ${domain}</span> <span>${now}</span>`;
+  activityLogList.prepend(item);
+}
+
+if (clearActivityLogBtn) {
+  clearActivityLogBtn.addEventListener("click", () => {
+    activityLogList.innerHTML = '<div class="log-empty">No browser actions executed yet.</div>';
+  });
+}
+
+// Safe Injected Field Filler (Runs in tab context via chrome.scripting.executeScript)
+function injectSafeFieldFill(selector, value) {
+  const el = document.querySelector(selector);
+  if (!el) return { success: false, error: `Element with selector '${selector}' not found.` };
+
+  // Strict sensitive check
+  const type = (el.type || "").toLowerCase();
+  const name = (el.name || "").toLowerCase();
+  const id = (el.id || "").toLowerCase();
+  const ac = (el.autocomplete || "").toLowerCase();
+
+  const sensitive = ["password", "card", "cvv", "secret", "token", "otp", "ssn", "pin"];
+  if (type === "password" || type === "hidden" || type === "file") {
+    return { success: false, error: "Security Refusal: Cannot fill password, hidden, or file inputs." };
+  }
+  for (const s of sensitive) {
+    if (name.includes(s) || id.includes(s) || ac.includes(s)) {
+      return { success: false, error: `Security Refusal: Field appears sensitive ('${s}'). Cannot automate.` };
+    }
+  }
+
+  // Set value and dispatch events
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+
+  return { success: true };
+}
+
+// Phase 8: Automation Execution Handler
+async function handleAutomationAction(activeTab) {
+  const approvedDomain = approvedDomainSelect.value;
+  if (!approvedDomain) {
+    showError("Please select or approve a domain first.");
+    return;
+  }
+
+  // Validate active tab domain
+  try {
+    const tabUrl = new URL(activeTab.url);
+    if (tabUrl.hostname !== approvedDomain && !tabUrl.hostname.endsWith("." + approvedDomain)) {
+      showError(`Domain mismatch: Active tab '${tabUrl.hostname}' does not match approved domain '${approvedDomain}'.`);
+      logActivity("DOMAIN_MISMATCH", tabUrl.hostname, "failure");
+      return;
+    }
+  } catch (e) {
+    showError("Invalid tab URL: " + e.message);
+    return;
+  }
+
+  const selectedAutoAction = document.querySelector("input[name='auto_action']:checked")?.value || "read";
+
+  if (selectedAutoAction === "fill") {
+    const selector = autoSelectorInput.value.trim();
+    const value = autoValueInput.value;
+    const desc = autoDescInput.value.trim();
+
+    if (!selector) {
+      showError("Please enter a CSS selector for the field to fill.");
+      return;
+    }
+
+    // Call backend to plan and validate action
+    try {
+      progressContainer.classList.remove("hidden");
+      progressText.textContent = "Validating field and planning action...";
+
+      const planResp = await fetch(`${BACKEND_URL}/api/browser/plan-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action_type: "fill_field",
+          approved_domain: approvedDomain,
+          selector: selector,
+          value: value,
+          field_description: desc || null,
+        }),
+      });
+
+      if (!planResp.ok) {
+        const errJson = await planResp.json().catch(() => ({}));
+        throw new Error(errJson.detail || `HTTP ${planResp.status}`);
+      }
+
+      const planData = await planResp.json();
+      pendingAutomationAction = {
+        action_type: "fill_field",
+        selector,
+        value,
+        approvedDomain,
+        confirmation_id: planData.confirmation_id,
+        tabId: activeTab.id,
+      };
+
+      // Show confirmation box
+      confirmationDescText.textContent = planData.description;
+      autoConfirmationBox.classList.remove("hidden");
+      progressContainer.classList.add("hidden");
+    } catch (err) {
+      progressContainer.classList.add("hidden");
+      showError(`Action planning rejected: ${err.message}`);
+      logActivity("PLAN_FILL_REJECTED", approvedDomain, "failure");
+    }
+  } else {
+    // Read page action within approved domain
+    logActivity("READ_PAGE", approvedDomain, "success");
+    // Delegates to normal read flow
+    originalHandleReadPage();
+  }
+}
+
+// Confirmation Buttons Listeners
+if (autoConfirmBtn) {
+  autoConfirmBtn.addEventListener("click", async () => {
+    if (!pendingAutomationAction) return;
+
+    try {
+      // 1. Confirm with backend
+      await fetch(`${BACKEND_URL}/api/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmation_id: pendingAutomationAction.confirmation_id,
+          approve: true,
+        }),
+      });
+
+      // 2. Injected execution in tab
+      const execResults = await chrome.scripting.executeScript({
+        target: { tabId: pendingAutomationAction.tabId },
+        func: injectSafeFieldFill,
+        args: [pendingAutomationAction.selector, pendingAutomationAction.value],
+      });
+
+      const res = execResults?.[0]?.result;
+      if (res && res.success) {
+        autoConfirmationBox.classList.add("hidden");
+        logActivity("FILL_FIELD", pendingAutomationAction.approvedDomain, "success");
+        alert("Field successfully filled! Reminder: Click the submit button manually when ready.");
+      } else {
+        throw new Error(res?.error || "Injected script execution failed.");
+      }
+    } catch (err) {
+      showError(`Execution failed: ${err.message}`);
+      logActivity("FILL_FIELD_ERROR", pendingAutomationAction.approvedDomain, "failure");
+    } finally {
+      pendingAutomationAction = null;
+    }
+  });
+}
+
+if (autoDenyBtn) {
+  autoDenyBtn.addEventListener("click", async () => {
+    if (pendingAutomationAction) {
+      logActivity("FILL_FIELD_DENIED", pendingAutomationAction.approvedDomain, "cancelled");
+      pendingAutomationAction = null;
+    }
+    autoConfirmationBox.classList.add("hidden");
+  });
+}
+
+// Update handleReadPage to branch into automation when mode is 'automation'
+const originalHandleReadPage = handleReadPage;
+handleReadPage = async function() {
+  const mode = document.querySelector("input[name='mode']:checked")?.value || "summary";
+  if (mode === "automation") {
+    hideError();
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      showError("No active tab found.");
+      return;
+    }
+    await handleAutomationAction(tab);
+  } else {
+    await originalHandleReadPage();
+  }
+};
+
+// Main DOMContentLoaded Init
 document.addEventListener("DOMContentLoaded", () => {
   checkBackendHealth();
   readBtn.addEventListener("click", handleReadPage);
@@ -332,4 +615,20 @@ document.addEventListener("DOMContentLoaded", () => {
   voiceDoneBtn.addEventListener("click", handleVoiceDone);
   voiceCancelBtn.addEventListener("click", handleVoiceCancel);
   stopSpeakingBtn.addEventListener("click", stopSpeaking);
+
+  // Phase 10: Open Demo Page Quick Action
+  const openDemoTabBtn = document.getElementById("open-demo-tab-btn");
+  if (openDemoTabBtn) {
+    openDemoTabBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const demoUrl = "http://127.0.0.1:8000/demo/";
+      if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: demoUrl });
+      } else {
+        window.open(demoUrl, "_blank");
+      }
+    });
+  }
 });
+
+

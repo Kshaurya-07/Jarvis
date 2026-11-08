@@ -13,6 +13,15 @@ from app.tools.reminders_tools import create_reminder, list_reminders, complete_
 from app.tools.memory_tools import remember_item, forget_item, list_memories
 from app.tools.search_tools import web_search
 from app.tools.briefing_tools import get_daily_briefing
+from app.tools.gmail_tools import list_gmail_messages, summarize_gmail_messages
+from app.tools.calendar_tools import list_calendar_events, summarize_calendar_events
+from app.tools.browser_automation_tools import (
+    browser_navigate,
+    browser_read_page,
+    browser_fill_field,
+)
+
+
 
 
 class ToolRegistry:
@@ -239,6 +248,112 @@ class ToolRegistry:
                 "include_web_summary": bool(inc_web),
                 "web_topics": str(topics).strip() if topics else None,
             }
+
+        elif name == "list_gmail_messages":
+            max_res = args.get("max_results", 5)
+            try:
+                max_res_int = int(max_res)
+            except Exception:
+                max_res_int = 5
+            q = args.get("query")
+            labels = args.get("label_ids")
+            return {
+                "max_results": max_res_int,
+                "query": str(q).strip() if q else None,
+                "label_ids": [str(lbl).strip() for lbl in labels] if isinstance(labels, list) else None,
+            }
+
+        elif name == "summarize_gmail_messages":
+            m_ids = args.get("message_ids")
+            max_res = args.get("max_results", 3)
+            try:
+                max_res_int = int(max_res)
+            except Exception:
+                max_res_int = 3
+            q = args.get("query")
+            custom_inst = args.get("custom_instructions")
+            return {
+                "message_ids": [str(m).strip() for m in m_ids] if isinstance(m_ids, list) else None,
+                "max_results": max_res_int,
+                "query": str(q).strip() if q else None,
+                "custom_instructions": str(custom_inst).strip() if custom_inst else None,
+            }
+
+        elif name == "list_calendar_events":
+            t_min = args.get("time_min")
+            t_max = args.get("time_max")
+            max_res = args.get("max_results", 10)
+            try:
+                max_res_int = int(max_res)
+            except Exception:
+                max_res_int = 10
+            cal_id = args.get("calendar_id", "primary")
+            return {
+                "time_min": str(t_min).strip() if t_min else None,
+                "time_max": str(t_max).strip() if t_max else None,
+                "max_results": max_res_int,
+                "calendar_id": str(cal_id).strip() if cal_id else "primary",
+            }
+
+        elif name == "summarize_calendar_events":
+            t_min = args.get("time_min")
+            t_max = args.get("time_max")
+            cal_id = args.get("calendar_id", "primary")
+            return {
+                "time_min": str(t_min).strip() if t_min else None,
+                "time_max": str(t_max).strip() if t_max else None,
+                "calendar_id": str(cal_id).strip() if cal_id else "primary",
+            }
+
+        elif name == "browser_navigate":
+            url = args.get("url")
+            if not url or not isinstance(url, str):
+                raise ValueError("Argument 'url' is required and must be a non-empty string.")
+            dom = args.get("approved_domain")
+            if not dom or not isinstance(dom, str):
+                raise ValueError("Argument 'approved_domain' is required.")
+            conf_id = args.get("confirmation_id")
+            validated = {
+                "url": url.strip(),
+                "approved_domain": dom.strip(),
+            }
+            if conf_id:
+                validated["confirmation_id"] = str(conf_id).strip()
+            return validated
+
+        elif name == "browser_read_page":
+            dom = args.get("approved_domain")
+            if not dom or not isinstance(dom, str):
+                raise ValueError("Argument 'approved_domain' is required.")
+            url = args.get("url")
+            p_text = args.get("page_text")
+            return {
+                "approved_domain": dom.strip(),
+                "url": str(url).strip() if url else None,
+                "page_text": str(p_text) if p_text else None,
+            }
+
+        elif name == "browser_fill_field":
+            sel = args.get("selector")
+            if not sel or not isinstance(sel, str):
+                raise ValueError("Argument 'selector' is required.")
+            val = args.get("value")
+            if val is None:
+                raise ValueError("Argument 'value' is required.")
+            dom = args.get("approved_domain")
+            if not dom or not isinstance(dom, str):
+                raise ValueError("Argument 'approved_domain' is required.")
+            desc = args.get("field_description")
+            conf_id = args.get("confirmation_id")
+            res = {
+                "selector": sel.strip(),
+                "value": str(val),
+                "approved_domain": dom.strip(),
+                "field_description": str(desc).strip() if desc else None,
+            }
+            if conf_id:
+                res["confirmation_id"] = str(conf_id).strip()
+            return res
 
         return args
 
@@ -597,3 +712,216 @@ tool_registry.register(
     },
     func=get_daily_briefing,
 )
+
+# --- Register Phase 6 Tools (Read-Only Gmail & Google Calendar) ---
+
+tool_registry.register(
+    name="list_gmail_messages",
+    description=(
+        "List recent Gmail message headers (sender, subject, date, snippet). "
+        "Strictly read-only: does not send, delete, archive, label, or mark messages as read."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "max_results": {
+                "type": "INTEGER",
+                "description": "Maximum number of messages to retrieve (1 to 20, default 5).",
+            },
+            "query": {
+                "type": "STRING",
+                "description": "Optional search filter (e.g. 'is:unread', 'from:alice@example.com').",
+            },
+            "label_ids": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "Optional list of mailbox labels (e.g. ['INBOX']). Defaults to ['INBOX'].",
+            },
+        },
+        "required": [],
+    },
+    func=list_gmail_messages,
+)
+
+tool_registry.register(
+    name="summarize_gmail_messages",
+    description=(
+        "Summarize selected or recent Gmail messages using Gemini. "
+        "Transmits email content to Gemini for summarization. Strictly read-only."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "message_ids": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "Optional specific list of Gmail message IDs to summarize (max 5).",
+            },
+            "max_results": {
+                "type": "INTEGER",
+                "description": "Number of recent messages to summarize if message_ids is not supplied (1 to 5, default 3).",
+            },
+            "query": {
+                "type": "STRING",
+                "description": "Optional filter query (e.g. 'is:unread') when retrieving recent messages.",
+            },
+            "custom_instructions": {
+                "type": "STRING",
+                "description": "Optional instructions for the summary focus (e.g. 'highlight action items').",
+            },
+        },
+        "required": [],
+    },
+    func=summarize_gmail_messages,
+)
+
+tool_registry.register(
+    name="list_calendar_events",
+    description=(
+        "List upcoming Google Calendar events within a specified date range. "
+        "Strictly read-only: does not create, update, or delete calendar events."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "time_min": {
+                "type": "STRING",
+                "description": "Start datetime in ISO 8601 format (e.g. '2026-11-09T00:00:00Z'). Defaults to current UTC time.",
+            },
+            "time_max": {
+                "type": "STRING",
+                "description": "End datetime in ISO 8601 format (e.g. '2026-11-16T23:59:59Z'). Defaults to 7 days from time_min.",
+            },
+            "max_results": {
+                "type": "INTEGER",
+                "description": "Maximum events to return (1 to 25, default 10).",
+            },
+            "calendar_id": {
+                "type": "STRING",
+                "description": "Calendar identifier (defaults to 'primary').",
+            },
+        },
+        "required": [],
+    },
+    func=list_calendar_events,
+)
+
+tool_registry.register(
+    name="summarize_calendar_events",
+    description=(
+        "Summarize Google Calendar events across a specified date range using Gemini. "
+        "Transmits event details to Gemini for schedule overview. Strictly read-only."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "time_min": {
+                "type": "STRING",
+                "description": "Start datetime in ISO 8601 format. Defaults to current time.",
+            },
+            "time_max": {
+                "type": "STRING",
+                "description": "End datetime in ISO 8601 format. Defaults to 7 days from start time.",
+            },
+            "calendar_id": {
+                "type": "STRING",
+                "description": "Calendar identifier (defaults to 'primary').",
+            },
+        },
+        "required": [],
+    },
+    func=summarize_calendar_events,
+)
+
+# --- Register Phase 8 Tools (Limited Browser Automation) ---
+
+tool_registry.register(
+    name="browser_navigate",
+    description=(
+        "Navigate the active browser to an approved URL strictly within a user-approved domain. "
+        "Requires explicit user confirmation before executing navigation."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "url": {
+                "type": "STRING",
+                "description": "Target HTTP/HTTPS URL strictly within the approved domain.",
+            },
+            "approved_domain": {
+                "type": "STRING",
+                "description": "The user-approved domain (e.g. 'wikipedia.org').",
+            },
+            "confirmation_id": {
+                "type": "STRING",
+                "description": "Optional confirmation token if already approved by the user.",
+            },
+        },
+        "required": ["url", "approved_domain"],
+    },
+    func=browser_navigate,
+)
+
+tool_registry.register(
+    name="browser_read_page",
+    description=(
+        "Read visible text from an active webpage strictly within a user-approved domain. "
+        "Page content is treated as untrusted input. Strictly read-only."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "approved_domain": {
+                "type": "STRING",
+                "description": "The user-approved domain.",
+            },
+            "url": {
+                "type": "STRING",
+                "description": "Optional URL of the page being read for domain verification.",
+            },
+            "page_text": {
+                "type": "STRING",
+                "description": "Optional visible text content from the approved page.",
+            },
+        },
+        "required": ["approved_domain"],
+    },
+    func=browser_read_page,
+)
+
+tool_registry.register(
+    name="browser_fill_field",
+    description=(
+        "Fill an ordinary non-sensitive form field (e.g. search query box) on an approved domain. "
+        "Never fills passwords, credit card numbers, or auth tokens. Requires user confirmation. "
+        "The final submission control must be clicked manually by the user; the agent cannot submit forms."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "selector": {
+                "type": "STRING",
+                "description": "CSS selector for the target non-sensitive input field (e.g. '#search', 'input[name=\"q\"]').",
+            },
+            "value": {
+                "type": "STRING",
+                "description": "Ordinary non-sensitive value to insert into the field.",
+            },
+            "approved_domain": {
+                "type": "STRING",
+                "description": "The user-approved domain.",
+            },
+            "field_description": {
+                "type": "STRING",
+                "description": "Human-readable description of the field (e.g. 'Search Wikipedia box').",
+            },
+            "confirmation_id": {
+                "type": "STRING",
+                "description": "Optional confirmation token if already approved by user.",
+            },
+        },
+        "required": ["selector", "value", "approved_domain"],
+    },
+    func=browser_fill_field,
+)
+

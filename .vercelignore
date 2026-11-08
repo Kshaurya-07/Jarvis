@@ -1,0 +1,80 @@
+# ==============================================================================
+# Jarvis - Vercel Deployment Ignore Rules (.vercelignore)
+# ==============================================================================
+# Note: .vercelignore is NOT a security guarantee. It only applies to Vercel CLI
+# deployments; Git-based deployments (e.g. GitHub integration) bypass this file.
+# Secrets and private data must never be committed to source control.
+# ==============================================================================
+
+# 1. Environment & Configuration Files (exclude all .env variants)
+.env
+.env.*
+*.env
+*.env.*
+# Retain placeholder example for documentation only
+!.env.example
+
+# 2. Private Keys, Certificates & Credential Files
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+id_rsa*
+id_ed25519*
+id_ecdsa*
+id_dsa*
+*credentials*.json
+client_secret*.json
+service-account*.json
+token.json
+tokens.json
+
+# 3. Python Virtual Environments & Caches
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 4. Backend Application Code & Local Server Configurations
+# The backend is built strictly for local loopback execution (127.0.0.1:8000).
+app/
+requirements.txt
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 5. Automated Tests
+tests/
+
+# 6. Local User Data, Private Stores & Audit Logs
+data/
+notes/
+workspace/
+screenshots/
+backups/
+logs/
+*.jsonl
+*.sqlite
+*.sqlite3
+*.db
+
+# 7. Local Chrome Browser Extension
+# The extension runs unpacked locally in Google Chrome (chrome://extensions).
+extension/
+
+# 8. Git, OS & IDE Artifacts
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
