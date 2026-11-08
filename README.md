@@ -356,6 +356,60 @@ When the Jarvis backend server is running:
 - **State-Changing Action Confirmations**:
   - Commands requiring confirmation (e.g. `open_application`, `capture_screenshot`, `delete_reminder`) render interactive confirmation cards directly in the chat timeline, requiring explicit "Approve" or "Deny" user taps before execution.
 
+---
+
+## Secure Phone-to-Laptop Control via Tailscale Serve (Phase 11)
+
+Jarvis supports secure remote access from a mobile phone to your host laptop using **Tailscale Serve**. This allows you to open the hosted static PWA on your phone (`https://jarvis-kumar-shaurya.vercel.app`), view connection status, send commands, and halt active tasks while preserving strict localhost isolation on the laptop backend.
+
+### 1. Security Architecture
+- **Private Tailnet Isolation**: The connection is routed entirely within your private Tailscale network (VPN mesh). It does **not** use Tailscale Funnel, open public ports, public backends, or cloud relays.
+- **Laptop Backend Stays Bound to `127.0.0.1:8000`**: The FastAPI backend remains bound exclusively to local loopback (`127.0.0.1`). Tailscale Serve acts as an authenticated local reverse proxy terminating HTTPS on your private tailnet and proxying requests to `127.0.0.1:8000`.
+- **Strict Origin Enforcement**: The backend rejects all browser origins except the exact production PWA origin (`https://jarvis-kumar-shaurya.vercel.app`), verified preview (`https://jarvis-eta-ten-83.vercel.app`), localhost, and Chrome extensions. All untrusted origins return `403 Forbidden`.
+- **DNS Rebinding Defense**: Host headers are strictly validated against localhost and your private Tailscale MagicDNS domain (`*.ts.net`).
+- **One-Time Pairing Code**: A 6-digit numeric pairing code must be generated locally on the physical laptop. The code expires in 5 minutes (300 seconds), can only be used once, and is protected by brute-force rate limiting (maximum 5 failed attempts per minute).
+- **In-Memory Session Tokens**: Exchanging a valid pairing code yields an in-memory session token. The token is held **strictly in volatile JavaScript memory** on your phone. It is **never** saved to `localStorage`, `sessionStorage`, cookies, Vercel environment variables, or logs.
+- **Narrow Tool Scope & Confirmation Gates**: Remote access reuses validated Jarvis tools. No arbitrary PowerShell, shell, or Python execution is exposed. Sensitive and destructive actions require explicit approval.
+
+### 2. Setup Guide
+
+#### Step A: Enable Tailscale HTTPS on your Tailnet (One-time)
+1. Sign into the [Tailscale Admin Console](https://login.tailscale.com/admin/dns).
+2. Under the **DNS** tab:
+   - Ensure **MagicDNS** is enabled.
+   - Under **HTTPS Certificates**, enable HTTPS.
+
+#### Step B: Configure the Host Windows Laptop
+1. Install [Tailscale for Windows](https://tailscale.com/download/windows) and sign into your Tailscale account.
+2. Note your laptop's Tailscale domain (e.g., `https://laptop-name.tailnet-xyz.ts.net`).
+3. Start the Jarvis backend (bound strictly to localhost):
+   ```powershell
+   .\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+4. In another terminal, start Tailscale Serve:
+   ```powershell
+   tailscale serve --https=443 http://127.0.0.1:8000
+   ```
+   *(Tailscale Serve automatically provisions a Let's Encrypt TLS certificate for your tailnet domain).*
+5. Generate a one-time 5-minute pairing code:
+   ```powershell
+   .\.venv\Scripts\python -m app.cli pair
+   ```
+
+#### Step C: Connect from your Mobile Phone
+1. Install the Tailscale app on your phone (iOS / Android) and log into the **exact same Tailscale account**. Ensure Tailscale VPN is connected.
+2. Open the hosted Jarvis PWA in your mobile browser:
+   `https://jarvis-kumar-shaurya.vercel.app`
+3. Tap the **Settings** icon (top right) -> **Private Tailscale Connection**.
+4. In **Laptop Tailscale Address**, enter:
+   `https://<your-laptop-name>.<your-tailnet-name>.ts.net`
+5. In **One-Time Pairing Code**, enter the 6-digit code printed on your laptop.
+6. Tap **Connect & Pair**.
+7. The connection pill will update to **"Paired (Tailscale)"** and you can now send assistant commands, review actions, and manage confirmations securely.
+8. To disconnect at any time, open Settings and tap **Disconnect & Revoke Token**.
+
+---
+
 ### Phase 8: Limited Browser Automation (User-Approved Domains & Tasks)
 - **Approved Domain Scope & Allowlist**:
   - The user explicitly selects or approves allowed domains (e.g., `wikipedia.org`, `python.org`, `fastapi.tiangolo.com`, `docs.python.org`).

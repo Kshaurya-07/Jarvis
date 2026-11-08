@@ -209,6 +209,18 @@ body {
   padding: 4px 8px;
 }
 
+.notice-action-btn {
+  background-color: var(--accent);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* Active Operation / Stop Bar */
 .active-operation-bar {
   display: flex;

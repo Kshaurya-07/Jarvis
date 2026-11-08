@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     AUTH_FAILURE_RATE_LIMIT: int = 5  # Max authentication failures before temporary block
     AUTH_FAILURE_WINDOW_SECONDS: int = 60  # Rate limit window in seconds
 
+    # Remote Pairing & Tailscale Private Connection (Phase 11)
+    ALLOWED_ORIGINS: list[str] = []  # Extra origins permitted in addition to verified Vercel production/preview
+    TAILSCALE_HOST: Optional[str] = None  # Optional explicit Tailscale machine domain (e.g. laptop.tailnet.ts.net)
+    REMOTE_PAIRING_CODE_TIMEOUT_SECONDS: int = 300  # 5 minutes for short-lived pairing code
+    REMOTE_SESSION_TIMEOUT_SECONDS: int = 3600  # 1 hour for in-memory session token
+    PAIRING_RATE_LIMIT: int = 5  # Max 5 failed pairing attempts
+    PAIRING_RATE_LIMIT_WINDOW_SECONDS: int = 60  # 60s window for pairing rate limit
+
     def resolve_paths(self) -> None:
         """Resolve and initialize runtime directories."""
         self.WORKSPACE_DIR = self.WORKSPACE_DIR.resolve()

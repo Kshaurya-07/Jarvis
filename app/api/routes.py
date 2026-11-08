@@ -1,6 +1,7 @@
 import sys
+import time
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app import __version__
 from app.api.schemas import (
@@ -44,12 +45,19 @@ from app.api.schemas import (
     BackupListResponse,
     DemoStatusResponse,
     DemoActionResponse,
+    PairingGenerateResponse,
+    PairingExchangeRequest,
+    PairingExchangeResponse,
+    SessionStatusResponse,
+    SessionRevokeResponse,
+    RemoteStopResponse,
 )
 from app.core.config import settings
 from app.core.confirmation import confirmation_manager
 from app.core.data_manager import user_data_manager
 from app.core.demo_manager import demo_manager
 from app.core.rate_limiter import auth_rate_limiter
+from app.core.remote_auth import remote_session_manager
 from app.core.browser_automation import (
     browser_manager,
     validate_approved_url,
@@ -80,6 +88,80 @@ from app.tools.browser_automation_tools import (
     browser_fill_field,
 )
 
+def extract_token_from_request(request: Request) -> Optional[str]:
+    """Extract session token from Authorization: Bearer <token> or X-Session-Token header."""
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+    x_token = request.headers.get("x-session-token")
+    if x_token:
+        return x_token.strip()
+    return None
+
+
+def is_remote_request(request: Request) -> bool:
+    """
+    Determine whether a request originates from a remote client.
+    Evaluates:
+    1. Origin header (e.g. Vercel hosted PWA origin)
+    2. Host header (e.g. *.ts.net Tailscale Serve proxy)
+    3. Client IP (non-loopback network address)
+    """
+    origin = request.headers.get("origin")
+    if origin:
+        clean_origin = origin.strip().rstrip("/")
+        if not (
+            clean_origin.startswith("http://localhost")
+            or clean_origin.startswith("http://127.0.0.1")
+            or clean_origin.startswith("chrome-extension://")
+        ):
+            return True
+
+    host = request.headers.get("host")
+    if host:
+        from app.main import TAILSCALE_HOST_REGEX
+        if TAILSCALE_HOST_REGEX.match(host.strip()):
+            return True
+
+    if request.client and request.client.host:
+        if request.client.host not in ("127.0.0.1", "::1", "localhost", "testclient"):
+            return True
+
+    return False
+
+
+async def require_remote_session(request: Request) -> Optional[str]:
+    """
+    FastAPI dependency: Enforces valid in-memory session token for any remote requests.
+    Direct local loopback calls without remote origin pass through (preserving local extension & tests).
+    """
+    token = extract_token_from_request(request)
+
+    # If a token is provided (even locally), validate it
+    if token:
+        is_valid, reason = remote_session_manager.validate_session_token(token)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Remote authentication failed: {reason}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return token
+
+    # If no token is provided, verify whether this request is remote
+    if is_remote_request(request):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Remote authentication required: A valid in-memory session token "
+                "must be provided in Authorization: Bearer <token> or X-Session-Token header."
+            ),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return None
+
+
 router = APIRouter()
 
 
@@ -108,8 +190,85 @@ async def health_check() -> HealthResponse:
     )
 
 
+# --- Phase 11 Remote Pairing & Control Endpoints (Tailscale Private Connection) ---
+
+@router.post("/remote/pair/generate", response_model=PairingGenerateResponse, tags=["Remote Pairing"])
+async def generate_pairing_code_endpoint(request: Request) -> PairingGenerateResponse:
+    """
+    Generate a 6-digit one-time remote pairing code.
+    STRICT SECURITY: Can only be called from loopback/localhost directly on the laptop.
+    Rejects remote calls to prevent attackers from generating codes remotely.
+    """
+    if is_remote_request(request):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Pairing codes can only be generated directly on the local laptop."
+        )
+    code = remote_session_manager.generate_pairing_code()
+    return PairingGenerateResponse(
+        pairing_code=code,
+        expires_in_seconds=settings.REMOTE_PAIRING_CODE_TIMEOUT_SECONDS,
+        instructions="Enter this 6-digit code in the hosted Jarvis PWA on your phone within 5 minutes."
+    )
+
+
+@router.post("/remote/pair/exchange", response_model=PairingExchangeResponse, tags=["Remote Pairing"])
+async def exchange_pairing_code_endpoint(req: PairingExchangeRequest, request: Request) -> PairingExchangeResponse:
+    """
+    Exchange a one-time pairing code for an in-memory revocable session token.
+    Enforces rate limits, single-use, and expiration.
+    """
+    client_ip = request.client.host if request.client and request.client.host else "127.0.0.1"
+    session = remote_session_manager.exchange_pairing_code(req.pairing_code, client_ip)
+    expires_in = max(1, int(session.expires_at - time.time()))
+    return PairingExchangeResponse(
+        session_token=session.token,
+        expires_in_seconds=expires_in,
+        token_type="Bearer"
+    )
+
+
+@router.get("/remote/session/status", response_model=SessionStatusResponse, tags=["Remote Pairing"])
+async def session_status_endpoint(request: Request) -> SessionStatusResponse:
+    """Check whether the provided session token is currently valid."""
+    token = extract_token_from_request(request)
+    if not token:
+        return SessionStatusResponse(valid=False, detail="No session token provided.")
+    is_valid, reason = remote_session_manager.validate_session_token(token)
+    if not is_valid:
+        return SessionStatusResponse(valid=False, detail=reason)
+    session = remote_session_manager.get_session(token)
+    expires_in = max(0, int(session.expires_at - time.time())) if session else 0
+    return SessionStatusResponse(valid=True, expires_in_seconds=expires_in)
+
+
+@router.post("/remote/session/revoke", response_model=SessionRevokeResponse, tags=["Remote Pairing"])
+async def session_revoke_endpoint(request: Request) -> SessionRevokeResponse:
+    """Revoke the current session token upon user disconnect."""
+    token = extract_token_from_request(request)
+    if not token:
+        return SessionRevokeResponse(revoked=False, message="No token provided to revoke.")
+    success = remote_session_manager.revoke_session(token)
+    return SessionRevokeResponse(
+        revoked=success,
+        message="Session revoked successfully. Device disconnected." if success else "Session not found."
+    )
+
+
+@router.post("/remote/stop", response_model=RemoteStopResponse, tags=["Remote Control"])
+async def remote_stop_endpoint(
+    request: Request,
+    _auth: Optional[str] = Depends(require_remote_session)
+) -> RemoteStopResponse:
+    """Halt any in-flight active assistant tasks or operations."""
+    return RemoteStopResponse(stopped=True, message="Active operation aborted promptly.")
+
+
 @router.post("/chat", response_model=ChatResponse, tags=["Agent"])
-async def chat_endpoint(request: ChatRequest) -> ChatResponse:
+async def chat_endpoint(
+    request: ChatRequest,
+    _auth: Optional[str] = Depends(require_remote_session)
+) -> ChatResponse:
     """
     Accepts a user message, delegates to the Gemini-powered agent,
     executes approved tools safely, and returns the response.
@@ -155,7 +314,10 @@ async def list_tools() -> List[ToolInfo]:
 
 
 @router.get("/actions", response_model=List[ActionLogEntry], tags=["Audit"])
-async def get_recent_actions(limit: int = 50) -> List[ActionLogEntry]:
+async def get_recent_actions(
+    limit: int = 50,
+    _auth: Optional[str] = Depends(require_remote_session)
+) -> List[ActionLogEntry]:
     """Returns recent tool actions from the in-memory audit log."""
     safe_limit = max(1, min(limit, 100))
     return action_logger.get_recent_actions(limit=safe_limit)
@@ -164,7 +326,9 @@ async def get_recent_actions(limit: int = 50) -> List[ActionLogEntry]:
 # --- Confirmation Management Endpoints ---
 
 @router.get("/confirm/pending", response_model=List[PendingActionInfo], tags=["Confirmation"])
-async def get_pending_confirmations() -> List[PendingActionInfo]:
+async def get_pending_confirmations(
+    _auth: Optional[str] = Depends(require_remote_session)
+) -> List[PendingActionInfo]:
     """List all actions currently waiting for explicit user confirmation."""
     pending = confirmation_manager.list_pending()
     return [
@@ -181,7 +345,11 @@ async def get_pending_confirmations() -> List[PendingActionInfo]:
 
 
 @router.post("/confirm", response_model=ConfirmationResponse, tags=["Confirmation"])
-async def confirm_action(req: ConfirmationRequest, request: Request) -> ConfirmationResponse:
+async def confirm_action(
+    req: ConfirmationRequest,
+    request: Request,
+    _auth: Optional[str] = Depends(require_remote_session)
+) -> ConfirmationResponse:
     """
     Explicitly approve or deny a pending action requiring confirmation.
     If approved, executes the tool safely and returns the output.

@@ -381,5 +381,46 @@ class DemoActionResponse(BaseModel):
     note_file: Optional[str] = None
 
 
+# --- Phase 11 Schemas (Tailscale Phone-to-Laptop Control) ---
+
+class PairingGenerateResponse(BaseModel):
+    """Response containing newly generated one-time pairing code for remote device pairing."""
+    pairing_code: str
+    expires_in_seconds: int
+    instructions: str
+
+
+class PairingExchangeRequest(BaseModel):
+    """Request payload from remote client exchanging one-time pairing code for in-memory session token."""
+    pairing_code: str = Field(..., min_length=4, max_length=16)
+
+
+class PairingExchangeResponse(BaseModel):
+    """Response containing in-memory session token for authenticated remote calls."""
+    session_token: str
+    expires_in_seconds: int
+    token_type: str = "Bearer"
+
+
+class SessionStatusResponse(BaseModel):
+    """Response verifying whether the currently held session token is active."""
+    valid: bool
+    expires_in_seconds: Optional[int] = None
+    detail: Optional[str] = None
+
+
+class SessionRevokeResponse(BaseModel):
+    """Response from revoking an active session token upon user disconnect."""
+    revoked: bool
+    message: str
+
+
+class RemoteStopResponse(BaseModel):
+    """Response from halting active tasks via remote stop control."""
+    stopped: bool
+    message: str
+
+
+
 
 

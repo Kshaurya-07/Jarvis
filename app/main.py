@@ -13,35 +13,69 @@ from app.core.config import settings, ConfigurationError
 from app.core.logger import app_logger
 from app.core.security import SecurityViolationError, InvalidPathError
 
+# Approved exact static Vercel production and verified preview origins
+APPROVED_STATIC_ORIGINS = [
+    "https://jarvis-kumar-shaurya.vercel.app",
+    "https://jarvis-eta-ten-83.vercel.app",
+]
+
 # Regex permitting localhost, 127.0.0.1 (any port), and Chrome extension origins
 ALLOWED_ORIGIN_REGEX = re.compile(
     r"^(http://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-zA-Z0-9]+)$"
 )
 
-# Regex permitting only localhost, 127.0.0.1, or testclient Host headers (DNS rebinding defense)
+# Regex permitting localhost, 127.0.0.1, or testclient Host headers (DNS rebinding defense)
 ALLOWED_HOST_REGEX = re.compile(
     r"^(localhost|127\.0\.0\.1|testserver)(:\d+)?$"
 )
 
+# Regex permitting private Tailscale MagicDNS addresses (*.ts.net) or Tailscale CGNAT IP (100.x.y.z)
+TAILSCALE_HOST_REGEX = re.compile(
+    r"^([a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.ts\.net|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$"
+)
+
 
 def is_allowed_origin(origin: str) -> bool:
-    """Validate whether an Origin header belongs to an approved localhost or extension origin."""
+    """
+    Validate whether an Origin header belongs to an approved origin.
+    Permits exact Vercel production origin, verified preview origin, localhost,
+    Chrome extension origins, and custom origins configured in settings.ALLOWED_ORIGINS.
+    Rejects all unauthorized origins.
+    """
     if not origin:
         return True  # Direct non-browser requests (e.g. curl, test client)
+    clean_origin = origin.strip().rstrip("/")
+    if clean_origin in APPROVED_STATIC_ORIGINS:
+        return True
+    if clean_origin in settings.ALLOWED_ORIGINS:
+        return True
     return bool(ALLOWED_ORIGIN_REGEX.match(origin))
 
 
 def is_allowed_host(host_header: str) -> bool:
-    """Validate whether a Host header matches approved localhost addresses."""
+    """Validate whether a Host header matches approved localhost or Tailscale Serve addresses."""
     if not host_header:
         return True
-    return bool(ALLOWED_HOST_REGEX.match(host_header.strip()))
+    host_clean = host_header.strip()
+    if bool(ALLOWED_HOST_REGEX.match(host_clean)):
+        return True
+    if bool(TAILSCALE_HOST_REGEX.match(host_clean)):
+        return True
+    if settings.TAILSCALE_HOST and host_clean.startswith(settings.TAILSCALE_HOST):
+        return True
+    return False
 
 
 def is_allowed_referer(referer: str) -> bool:
-    """Validate whether a Referer header originates from localhost or an extension."""
+    """Validate whether a Referer header originates from an approved origin."""
     if not referer:
         return True
+    for approved in APPROVED_STATIC_ORIGINS:
+        if referer.startswith(approved):
+            return True
+    for custom in settings.ALLOWED_ORIGINS:
+        if referer.startswith(custom):
+            return True
     return bool(
         referer.startswith("http://localhost")
         or referer.startswith("http://127.0.0.1")
@@ -161,9 +195,10 @@ async def origin_validation_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# Enable CORS for localhost and Chrome extensions
+# Enable CORS for localhost, Chrome extensions, and approved Vercel static PWA origins
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=APPROVED_STATIC_ORIGINS + settings.ALLOWED_ORIGINS,
     allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-zA-Z0-9]+)$",
     allow_credentials=True,
     allow_methods=["*"],

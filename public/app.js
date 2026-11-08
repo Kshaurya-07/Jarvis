@@ -45,10 +45,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysGoogle = document.getElementById("sys-google");
   const sysToolsCount = document.getElementById("sys-tools-count");
 
+  // Phase 11 Remote Pairing Elements
+  const noticePairBtn = document.getElementById("notice-pair-btn");
+  const remoteGatewayUrlInput = document.getElementById("remote-gateway-url");
+  const pairingCodeInput = document.getElementById("pairing-code-input");
+  const pairSubmitBtn = document.getElementById("pair-submit-btn");
+  const pairControlsContainer = document.getElementById("pair-controls-container");
+  const pairedStatusContainer = document.getElementById("paired-status-container");
+  const disconnectBtn = document.getElementById("disconnect-btn");
+  const localPairHelper = document.getElementById("local-pair-helper");
+  const generatePairingCodeBtn = document.getElementById("generate-pairing-code-btn");
+  const generatedCodeDisplay = document.getElementById("generated-code-display");
+  const displayedCode = document.getElementById("displayed-code");
+
   // State
   let activeAbortController = null;
   let recognitionInstance = null;
   let isRecording = false;
+
+  // Phase 11: In-Memory Session Token ONLY (Never stored in localStorage, cookies, or logs!)
+  let remoteSessionToken = null;
+  const GATEWAY_URL_KEY = "jarvis_tailscale_gateway_url";
 
   // Initialize PWA Service Worker
   if ("serviceWorker" in navigator) {
@@ -57,37 +74,61 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Network & Option B Verification ---
+  // --- Network & Option B / Tailscale Verification ---
   const isLocalhostHost = (
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1" ||
     window.location.hostname === "[::1]"
   );
 
+  function getBaseUrl() {
+    if (isLocalhostHost) {
+      return "";
+    }
+    const custom = (remoteGatewayUrlInput?.value || localStorage.getItem(GATEWAY_URL_KEY) || "").trim();
+    return custom ? custom.replace(/\/+$/, "") : "";
+  }
+
+  async function apiFetch(endpoint, options = {}) {
+    const baseUrl = getBaseUrl();
+    const url = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
+    options.headers = options.headers || {};
+    if (remoteSessionToken) {
+      options.headers["Authorization"] = `Bearer ${remoteSessionToken}`;
+      options.headers["X-Session-Token"] = remoteSessionToken;
+    }
+    return fetch(url, options);
+  }
+
   async function checkHealth() {
     try {
-      const resp = await fetch("/health", { cache: "no-store" });
+      const resp = await apiFetch("/health", { cache: "no-store" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
-      connectionPill.className = "connection-pill online";
-      connectionText.textContent = "Online";
+      if (isLocalhostHost) {
+        connectionPill.className = "connection-pill online";
+        connectionText.textContent = "Online (Local)";
+      } else if (remoteSessionToken) {
+        connectionPill.className = "connection-pill online";
+        connectionText.textContent = "Paired (Tailscale)";
+        networkNotice.style.display = "none";
+      } else {
+        connectionPill.className = "connection-pill checking";
+        connectionText.textContent = "Reachable (Unpaired)";
+        networkNotice.style.display = "flex";
+      }
 
       if (sysVersion) sysVersion.textContent = data.version || "1.0.0";
       if (sysPlatform) sysPlatform.textContent = data.platform || "windows";
       if (sysGemini) sysGemini.textContent = data.gemini_configured ? "Ready" : "No API Key";
       if (sysGoogle) sysGoogle.textContent = data.google_connected ? "Connected" : "Not Connected";
       if (sysToolsCount) sysToolsCount.textContent = (data.active_tools || []).length;
-
-      // In Option B, if accessing from a non-localhost hostname (e.g. phone on LAN)
-      if (!isLocalhostHost) {
-        networkNotice.style.display = "flex";
-      }
     } catch (e) {
       connectionPill.className = "connection-pill offline";
       connectionText.textContent = "Offline";
 
-      if (!isLocalhostHost) {
+      if (!isLocalhostHost && !remoteSessionToken) {
         networkNotice.style.display = "flex";
       }
     }
@@ -96,6 +137,120 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial health check and periodic ping
   checkHealth();
   setInterval(checkHealth, 15000);
+
+  if (noticePairBtn) {
+    noticePairBtn.addEventListener("click", () => {
+      openDrawer(settingsDrawer);
+    });
+  }
+
+  // Load saved gateway URL on initialization (non-sensitive host config)
+  if (remoteGatewayUrlInput) {
+    const savedGateway = localStorage.getItem(GATEWAY_URL_KEY) || "";
+    remoteGatewayUrlInput.value = savedGateway;
+    remoteGatewayUrlInput.addEventListener("change", () => {
+      localStorage.setItem(GATEWAY_URL_KEY, remoteGatewayUrlInput.value.trim());
+      checkHealth();
+    });
+  }
+
+  // Show local pairing helper only when accessed on localhost
+  if (localPairHelper && isLocalhostHost) {
+    localPairHelper.style.display = "block";
+  }
+
+  // Generate pairing code locally
+  if (generatePairingCodeBtn) {
+    generatePairingCodeBtn.addEventListener("click", async () => {
+      generatePairingCodeBtn.disabled = true;
+      try {
+        const resp = await apiFetch("/api/remote/pair/generate", { method: "POST" });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        displayedCode.textContent = data.pairing_code;
+        generatedCodeDisplay.style.display = "block";
+        if (pairingCodeInput) pairingCodeInput.value = data.pairing_code;
+      } catch (err) {
+        alert("Failed to generate code: " + err.message);
+      } finally {
+        generatePairingCodeBtn.disabled = false;
+      }
+    });
+  }
+
+  // Connect & Pair
+  if (pairSubmitBtn) {
+    pairSubmitBtn.addEventListener("click", async () => {
+      const code = (pairingCodeInput?.value || "").trim();
+      const gateway = (remoteGatewayUrlInput?.value || "").trim();
+
+      if (!isLocalhostHost && !gateway) {
+        alert("Please enter your laptop's Tailscale address (e.g. https://laptop-name.tailnet-xyz.ts.net).");
+        return;
+      }
+      if (!code) {
+        alert("Please enter the 6-digit one-time pairing code from your laptop.");
+        return;
+      }
+
+      if (gateway) {
+        localStorage.setItem(GATEWAY_URL_KEY, gateway);
+      }
+
+      pairSubmitBtn.disabled = true;
+      pairSubmitBtn.textContent = "Pairing...";
+
+      try {
+        const targetUrl = (getBaseUrl() || "") + "/api/remote/pair/exchange";
+        const resp = await fetch(targetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairing_code: code }),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server returned HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        // Store in volatile memory ONLY!
+        remoteSessionToken = data.session_token;
+
+        if (pairingCodeInput) pairingCodeInput.value = "";
+        pairControlsContainer.style.display = "none";
+        pairedStatusContainer.style.display = "block";
+
+        appendMessage("assistant", "**Secure Tailscale Pairing Active:** Connected to laptop backend. Session token held in volatile memory.");
+        closeAllDrawers();
+        checkHealth();
+      } catch (err) {
+        alert("Pairing failed: " + err.message);
+      } finally {
+        pairSubmitBtn.disabled = false;
+        pairSubmitBtn.textContent = "Connect & Pair";
+      }
+    });
+  }
+
+  // Disconnect & Revoke
+  if (disconnectBtn) {
+    disconnectBtn.addEventListener("click", async () => {
+      if (remoteSessionToken) {
+        try {
+          await apiFetch("/api/remote/session/revoke", { method: "POST" });
+        } catch (_) {}
+      }
+      remoteSessionToken = null;
+      pairedStatusContainer.style.display = "none";
+      pairControlsContainer.style.display = "block";
+      appendMessage("assistant", "Disconnected from laptop. In-memory session token has been revoked.");
+      checkHealth();
+    });
+  }
 
   if (closeNoticeBtn) {
     closeNoticeBtn.addEventListener("click", () => {
@@ -177,7 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setOperationActive(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
@@ -222,13 +377,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Stop / Pause Control ---
-  stopBtn.addEventListener("click", () => {
+  stopBtn.addEventListener("click", async () => {
     if (activeAbortController) {
       activeAbortController.abort();
     }
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+    try {
+      await apiFetch("/api/remote/stop", { method: "POST" });
+    } catch (_) {}
   });
 
   // --- Chat Message Rendering ---
@@ -282,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Confirmation Workflow Integration ---
   async function checkForPendingConfirmations() {
     try {
-      const resp = await fetch("/api/confirm/pending");
+      const resp = await apiFetch("/api/confirm/pending");
       if (!resp.ok) return;
       const pendingList = await resp.json();
       if (!Array.isArray(pendingList) || pendingList.length === 0) return;
@@ -320,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function resolveConfirmation(confId, approve, cardEl) {
     try {
-      const resp = await fetch("/api/confirm", {
+      const resp = await apiFetch("/api/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmation_id: confId, approve }),
@@ -468,7 +626,7 @@ document.addEventListener("DOMContentLoaded", () => {
     seedDemoBtn.addEventListener("click", async () => {
       seedDemoBtn.disabled = true;
       try {
-        const resp = await fetch("/api/demo/seed", { method: "POST" });
+        const resp = await apiFetch("/api/demo/seed", { method: "POST" });
         const res = await resp.json();
         if (resp.ok) {
           appendMessage("assistant", `**Demo Data Seeded:** ${res.message || "Fictional mission notes, reminders, and memory created with [DEMO] tag."}`);
@@ -491,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       resetDemoBtn.disabled = true;
       try {
-        const resp = await fetch("/api/demo/reset", { method: "POST" });
+        const resp = await apiFetch("/api/demo/reset", { method: "POST" });
         const res = await resp.json();
         if (resp.ok) {
           appendMessage("assistant", `**Demo Cleanup Complete:** ${res.message || "All [DEMO] records have been removed."}`);
@@ -511,7 +669,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadRecentActions() {
     actionsList.innerHTML = '<div class="actions-empty">Loading audit actions...</div>';
     try {
-      const resp = await fetch("/api/actions?limit=25");
+      const resp = await apiFetch("/api/actions?limit=25");
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const actions = await resp.json();
 
