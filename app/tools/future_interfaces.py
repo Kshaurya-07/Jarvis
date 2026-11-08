@@ -1,8 +1,8 @@
 """
 Future Tool Interfaces and Architectural Placeholders for Jarvis.
 
-NOTE: None of these tools are currently functional in Phase 1.
-They define clean interfaces and architectural contracts for future phases.
+NOTE: None of these tools are currently functional.
+They define clean interfaces, platform constraints, and architectural contracts for future phases.
 Jarvis will never claim or pretend these features are active until implemented.
 """
 
@@ -14,6 +14,85 @@ from pydantic import BaseModel
 class FutureFeatureNotImplementedError(NotImplementedError):
     """Raised when a future, unactivated feature interface is called."""
     pass
+
+
+class WiFiControlInterface(ABC):
+    """
+    Interface for Wi-Fi status inspection and network profile management.
+    
+    Platform & Permission Requirements (Planned for Phase 3):
+    - Windows API: Native Windows WLAN API (`wlanapi.dll`) or `netsh wlan`.
+    - OS Permissions: Requires Administrator or 'Network Configuration Operators' group membership
+      to modify network states, connect to new SSIDs, or toggle adapter radio states.
+    - Security Contract:
+      * Must require explicit user confirmation before disconnecting or switching networks.
+      * Must never log or store WPA2/WPA3 pre-shared keys or network credentials in plaintext or memory.
+    """
+
+    @abstractmethod
+    async def get_wifi_status(self) -> Dict[str, Any]:
+        """TODO [Phase 3]: Query connected SSID, signal strength, and adapter state."""
+        raise FutureFeatureNotImplementedError("Wi-Fi management is planned for a future phase.")
+
+    @abstractmethod
+    async def toggle_wifi(self, enable: bool) -> bool:
+        """TODO [Phase 3]: Enable or disable Wi-Fi radio with explicit user confirmation."""
+        raise FutureFeatureNotImplementedError("Wi-Fi control is planned for a future phase.")
+
+
+class VolumeControlInterface(ABC):
+    """
+    Interface for Windows system audio volume and mute controls.
+    
+    Platform & Permission Requirements (Planned for Phase 3):
+    - Windows API: Windows Core Audio APIs (`IAudioEndpointVolume` via `pycaw` / `comtypes`).
+    - OS Permissions: Requires an active interactive desktop session (Session 1+).
+      Fails silently or throws errors when running as a headless Windows Service (Session 0).
+    - Security Contract:
+      * Must clamp master volume to safe listening levels (e.g. max 100%, user-set safety cap).
+      * No elevated admin rights required for standard audio endpoint adjustments.
+    """
+
+    @abstractmethod
+    async def get_master_volume(self) -> float:
+        """TODO [Phase 3]: Retrieve master audio volume level (0.0 to 1.0)."""
+        raise FutureFeatureNotImplementedError("Volume control is planned for a future phase.")
+
+    @abstractmethod
+    async def set_master_volume(self, level: float) -> bool:
+        """TODO [Phase 3]: Adjust master audio volume with user confirmation."""
+        raise FutureFeatureNotImplementedError("Volume control is planned for a future phase.")
+
+    @abstractmethod
+    async def toggle_mute(self) -> bool:
+        """TODO [Phase 3]: Toggle master audio mute state."""
+        raise FutureFeatureNotImplementedError("Volume mute control is planned for a future phase.")
+
+
+class BrightnessControlInterface(ABC):
+    """
+    Interface for laptop display brightness adjustment.
+    
+    Platform & Permission Requirements (Planned for Phase 3):
+    - Windows API: Windows Management Instrumentation (WMI `WmiMonitorBrightnessMethods` in root/wmi)
+      or High Level Monitor Configuration APIs (`dxva2.dll`).
+    - Hardware/Driver Requirements:
+      * Internal laptop screens require ACPI/WMI brightness method support in display drivers.
+      * External desktop monitors require DDC/CI communication over DisplayPort/HDMI/VGA.
+      * Unavailable on virtual machines, remote desktop sessions, or without display driver support.
+    - Security Contract:
+      * Clamp brightness between 10% and 100% to prevent unreadable dark screens.
+    """
+
+    @abstractmethod
+    async def get_brightness(self) -> int:
+        """TODO [Phase 3]: Query current display brightness percentage."""
+        raise FutureFeatureNotImplementedError("Brightness control is planned for a future phase.")
+
+    @abstractmethod
+    async def set_brightness(self, level_percent: int) -> bool:
+        """TODO [Phase 3]: Adjust display brightness with confirmation."""
+        raise FutureFeatureNotImplementedError("Brightness control is planned for a future phase.")
 
 
 class BrowserExtensionInterface(ABC):
@@ -28,61 +107,13 @@ class BrowserExtensionInterface(ABC):
 
     @abstractmethod
     async def get_active_tab_content(self) -> Dict[str, Any]:
-        """TODO [Phase 2]: Retrieve structured page text or DOM of the active tab."""
+        """TODO [Phase 4]: Retrieve structured page text or DOM of the active tab."""
         raise FutureFeatureNotImplementedError("Browser extension integration is planned for a future phase.")
 
     @abstractmethod
     async def click_element(self, selector: str) -> bool:
-        """TODO [Phase 2]: Click an element with user confirmation."""
+        """TODO [Phase 4]: Click an element with user confirmation."""
         raise FutureFeatureNotImplementedError("Browser element interaction is planned for a future phase.")
-
-
-class VisionLaptopControlInterface(ABC):
-    """
-    Interface for screenshot understanding and visible laptop control.
-    
-    Security Contract:
-    - Never perform arbitrary shell command execution.
-    - Always display visible indicators when screen capture is active.
-    - Prompt for user confirmation prior to any destructive action.
-    """
-
-    @abstractmethod
-    async def capture_screen(self, region: Optional[Dict[str, int]] = None) -> bytes:
-        """TODO [Phase 2]: Capture screen buffer for multimodal analysis."""
-        raise FutureFeatureNotImplementedError("Screenshot understanding is planned for a future phase.")
-
-    @abstractmethod
-    async def perform_click(self, x: int, y: int) -> bool:
-        """TODO [Phase 2]: Visible pointer action with confirmation."""
-        raise FutureFeatureNotImplementedError("Laptop UI control is planned for a future phase.")
-
-
-class VoiceIOInterface(ABC):
-    """
-    Interface for voice input (speech-to-text) and output (text-to-speech).
-    """
-
-    @abstractmethod
-    async def listen_for_command(self) -> str:
-        """TODO [Phase 3]: Capture audio from microphone and transcribe to text."""
-        raise FutureFeatureNotImplementedError("Voice input is planned for a future phase.")
-
-    @abstractmethod
-    async def speak(self, text: str) -> None:
-        """TODO [Phase 3]: Synthesize text to speech using local or cloud TTS."""
-        raise FutureFeatureNotImplementedError("Voice output is planned for a future phase.")
-
-
-class WebSearchInterface(ABC):
-    """
-    Interface for live web search and information retrieval.
-    """
-
-    @abstractmethod
-    async def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
-        """TODO [Phase 2]: Perform web search via approved search provider."""
-        raise FutureFeatureNotImplementedError("Web search is planned for a future phase.")
 
 
 class RemindersInterface(ABC):
@@ -92,55 +123,47 @@ class RemindersInterface(ABC):
 
     @abstractmethod
     async def set_reminder(self, title: str, timestamp_iso: str) -> Dict[str, Any]:
-        """TODO [Phase 2]: Schedule a user reminder."""
+        """TODO [Phase 3]: Schedule a user reminder."""
         raise FutureFeatureNotImplementedError("Reminders are planned for a future phase.")
 
     @abstractmethod
     async def list_reminders(self) -> List[Dict[str, Any]]:
-        """TODO [Phase 2]: List upcoming reminders."""
+        """TODO [Phase 3]: List upcoming reminders."""
         raise FutureFeatureNotImplementedError("Reminders are planned for a future phase.")
 
 
 class MemoryInterface(ABC):
     """
     Interface for persistent memory with user-controlled storage, inspection, and deletion.
-    
-    Security Contract:
-    - Never store passwords, cookies, or secrets.
-    - User must have complete control to list and purge memories at any time.
     """
 
     @abstractmethod
     async def remember(self, key: str, value: str) -> bool:
-        """TODO [Phase 2]: Save long-term memory."""
+        """TODO [Phase 3]: Save long-term memory."""
         raise FutureFeatureNotImplementedError("Memory storage is planned for a future phase.")
 
     @abstractmethod
     async def recall(self, query: str) -> List[Dict[str, str]]:
-        """TODO [Phase 2]: Recall relevant memory items."""
+        """TODO [Phase 3]: Recall relevant memory items."""
         raise FutureFeatureNotImplementedError("Memory recall is planned for a future phase.")
 
     @abstractmethod
     async def delete_memory(self, memory_id: str) -> bool:
-        """TODO [Phase 2]: User-controlled memory deletion."""
+        """TODO [Phase 3]: User-controlled memory deletion."""
         raise FutureFeatureNotImplementedError("Memory deletion is planned for a future phase.")
 
 
 class GoogleWorkspaceInterface(ABC):
     """
     Interface for Gmail and Google Calendar integrations using official OAuth 2.0 flows.
-    
-    Security Contract:
-    - Use strict, least-privilege OAuth scopes.
-    - Require user confirmation before sending emails or modifying calendar events.
     """
 
     @abstractmethod
     async def list_unread_emails(self, max_count: int = 10) -> List[Dict[str, Any]]:
-        """TODO [Phase 3]: Fetch unread email summaries via Gmail API."""
+        """TODO [Phase 4]: Fetch unread email summaries via Gmail API."""
         raise FutureFeatureNotImplementedError("Gmail integration is planned for a future phase.")
 
     @abstractmethod
     async def list_calendar_events(self, days_ahead: int = 7) -> List[Dict[str, Any]]:
-        """TODO [Phase 3]: Fetch upcoming calendar events via Google Calendar API."""
+        """TODO [Phase 4]: Fetch upcoming calendar events via Google Calendar API."""
         raise FutureFeatureNotImplementedError("Google Calendar integration is planned for a future phase.")

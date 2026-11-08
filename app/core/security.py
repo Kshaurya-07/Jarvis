@@ -34,6 +34,20 @@ class UnsupportedFileTypeError(Exception):
     pass
 
 
+class UnsupportedPlatformError(Exception):
+    """Raised when an OS-specific tool is called on an unsupported platform."""
+    pass
+
+
+def verify_windows_os(tool_name: str) -> None:
+    """Verifies that the current operating system is Windows."""
+    import sys
+    if sys.platform != "win32":
+        raise UnsupportedPlatformError(
+            f"Tool '{tool_name}' is only supported on Windows operating systems (current: {sys.platform})."
+        )
+
+
 def resolve_safe_path(
     base_dir: Path,
     user_path: str,

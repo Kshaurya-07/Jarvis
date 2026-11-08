@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jarvis Local Companion</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header with status badge -->
+    <header class="header">
+      <div class="logo-title">
+        <span class="logo-circle">J</span>
+        <h2>Jarvis Companion</h2>
+      </div>
+      <div id="backend-status" class="status-badge offline" title="Checking backend...">
+        <span class="status-dot"></span>
+        <span id="status-text">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Privacy Disclosure -->
+    <div class="disclosure-banner">
+      <span class="disclosure-icon">&#128274;</span>
+      <p>Only visible text from this active tab is read upon your click. Speech is transcribed locally via browser recognition; audio is never stored or sent externally.</p>
+    </div>
+
+    <!-- Mode Selector -->
+    <div class="mode-selector">
+      <label class="mode-option">
+        <input type="radio" name="mode" value="summary" checked>
+        <span>Page Summary</span>
+      </label>
+      <label class="mode-option">
+        <input type="radio" name="mode" value="quiz_help">
+        <span>Practice Quiz Help</span>
+      </label>
+    </div>
+
+    <!-- Voice Push-to-Talk Section -->
+    <div class="voice-section">
+      <div class="voice-controls-row">
+        <button id="voice-record-btn" class="btn btn-secondary voice-btn" title="Push to talk (microphone requested on click)">
+          <span class="btn-icon">&#127908;</span> Push to Talk
+        </button>
+        <label class="tts-toggle-label" title="Read responses aloud using local browser speech synthesis (off by default)">
+          <input type="checkbox" id="tts-toggle">
+          <span>Spoken replies</span>
+        </label>
+      </div>
+
+      <!-- Active recording banner (hidden until recording starts) -->
+      <div id="recording-banner" class="recording-banner hidden">
+        <div class="recording-indicator">
+          <span class="recording-pulse"></span>
+          <span class="recording-label">Listening... (Speak clearly)</span>
+        </div>
+        <div class="recording-buttons">
+          <button id="voice-done-btn" class="btn btn-small btn-primary">Done</button>
+          <button id="voice-cancel-btn" class="btn btn-small btn-danger">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question / Transcript editable input -->
+    <div class="form-group">
+      <label for="question-input">Question / Transcript (editable before sending):</label>
+      <textarea id="question-input" rows="2" placeholder="Ask a question about this page, or push to talk above to dictate..."></textarea>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="button-group">
+      <button id="read-btn" class="btn btn-primary">
+        <span class="btn-icon">&#128214;</span> Read This Page
+      </button>
+      <button id="stop-btn" class="btn btn-danger" disabled>
+        <span class="btn-icon">&#9632;</span> Stop
+      </button>
+    </div>
+
+    <!-- TTS Playing Control Bar (hidden unless speaking) -->
+    <div id="tts-control-bar" class="tts-control-bar hidden">
+      <span class="tts-speaking-text">&#128266; Speaking response...</span>
+      <button id="stop-speaking-btn" class="btn btn-small btn-danger">Stop Speaking</button>
+    </div>
+
+    <!-- Active Tab Info -->
+    <div id="tab-info" class="tab-info hidden">
+      <span class="tab-label">Inspected:</span>
+      <span id="tab-title" class="tab-title">Loading...</span>
+    </div>
+
+    <!-- Progress indicator -->
+    <div id="progress-container" class="progress-container hidden">
+      <div class="spinner"></div>
+      <span id="progress-text">Extracting visible page text...</span>
+    </div>
+
+    <!-- Results Container -->
+    <div id="result-container" class="result-container hidden">
+      <div class="result-header">
+        <span id="result-mode-tag" class="mode-tag">Summary</span>
+        <span id="char-count" class="char-count">0 chars</span>
+      </div>
+      <div id="result-text" class="result-content"></div>
+      <div class="api-notice" id="api-notice"></div>
+    </div>
+
+    <!-- Error message container -->
+    <div id="error-container" class="error-container hidden">
+      <p id="error-message"></p>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <small>Connected to <code>127.0.0.1:8000</code> &bull; Local Speech &bull; Non-graded study aid</small>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,18 @@ from app.api.routes import router
 from app.core.config import settings
 from app.core.logger import app_logger
 from app.core.security import SecurityViolationError, InvalidPathError
+
+# Regex permitting localhost, 127.0.0.1 (any port), and Chrome extension origins
+ALLOWED_ORIGIN_REGEX = re.compile(
+    r"^(http://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-zA-Z0-9]+)$"
+)
+
+
+def is_allowed_origin(origin: str) -> bool:
+    """Validate whether an Origin header belongs to an approved localhost or extension origin."""
+    if not origin:
+        return True  # Direct non-browser requests (e.g. curl, test client)
+    return bool(ALLOWED_ORIGIN_REGEX.match(origin))
 
 
 @asynccontextmanager
@@ -34,19 +47,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for local development and future frontends
+
+@app.middleware("http")
+async def origin_validation_middleware(request: Request, call_next):
+    """
+    Strict origin validation middleware:
+    Blocks unauthorized remote web origins attempting to call the local agent.
+    """
+    origin = request.headers.get("origin")
+    if origin and not is_allowed_origin(origin):
+        app_logger.warning("Rejected unauthorized origin: %s", origin)
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": (
+                    f"Access denied: Origin '{origin}' is not authorized. "
+                    "Only localhost and Chrome extension origins are permitted."
+                )
+            },
+        )
+    return await call_next(request)
+
+
+# Enable CORS for localhost and Chrome extensions
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:8080",
-    ],
+    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-zA-Z0-9]+)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
