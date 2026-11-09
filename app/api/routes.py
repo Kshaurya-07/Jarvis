@@ -162,6 +162,13 @@ async def require_remote_session(request: Request) -> Optional[str]:
     return None
 
 
+# Remote-session auth policy (Phase 11 hardening): every endpoint in this
+# router requires a valid remote session token for remote requests
+# (Depends(require_remote_session) on each handler), except /health,
+# /remote/pair/exchange and /remote/session/status, which are public by
+# design, and /remote/pair/generate, which is local-only via its own guard.
+# Local loopback requests (and the Chrome extension) pass through without
+# a token, preserving local use and the existing test suite.
 router = APIRouter()
 
 
@@ -243,7 +250,7 @@ async def session_status_endpoint(request: Request) -> SessionStatusResponse:
 
 
 @router.post("/remote/session/revoke", response_model=SessionRevokeResponse, tags=["Remote Pairing"])
-async def session_revoke_endpoint(request: Request) -> SessionRevokeResponse:
+async def session_revoke_endpoint(request: Request, _auth: Optional[str] = Depends(require_remote_session)) -> SessionRevokeResponse:
     """Revoke the current session token upon user disconnect."""
     token = extract_token_from_request(request)
     if not token:
@@ -301,7 +308,7 @@ async def chat_endpoint(
 
 
 @router.get("/tools", response_model=List[ToolInfo], tags=["Tools"])
-async def list_tools() -> List[ToolInfo]:
+async def list_tools(_auth: Optional[str] = Depends(require_remote_session)) -> List[ToolInfo]:
     """Returns all currently active and approved tools."""
     return [
         ToolInfo(
@@ -396,7 +403,7 @@ async def confirm_action(
 # --- Extension Endpoints ---
 
 @router.post("/extension/read-page", response_model=PageReadResponse, tags=["Extension"])
-async def read_page_endpoint(req: PageReadRequest) -> PageReadResponse:
+async def read_page_endpoint(req: PageReadRequest, _auth: Optional[str] = Depends(require_remote_session)) -> PageReadResponse:
     """
     Endpoint for Jarvis Chrome extension.
     Accepts visible text extracted from user-selected active tab, analyzes with Gemini,
@@ -429,7 +436,7 @@ async def read_page_endpoint(req: PageReadRequest) -> PageReadResponse:
 # --- Phase 4: Reminders Endpoints ---
 
 @router.get("/reminders", response_model=List[ReminderResponse], tags=["Reminders"])
-async def get_reminders(include_completed: bool = False) -> List[ReminderResponse]:
+async def get_reminders(include_completed: bool = False, _auth: Optional[str] = Depends(require_remote_session)) -> List[ReminderResponse]:
     """List all saved local reminders."""
     items = reminders_storage.list_all(include_completed=include_completed)
     return [
@@ -447,7 +454,7 @@ async def get_reminders(include_completed: bool = False) -> List[ReminderRespons
 
 
 @router.post("/reminders", response_model=ReminderResponse, status_code=status.HTTP_201_CREATED, tags=["Reminders"])
-async def create_reminder_endpoint(req: ReminderCreateRequest) -> ReminderResponse:
+async def create_reminder_endpoint(req: ReminderCreateRequest, _auth: Optional[str] = Depends(require_remote_session)) -> ReminderResponse:
     """Create a new local reminder on the laptop."""
     r = reminders_storage.add(
         title=req.title,
@@ -466,7 +473,7 @@ async def create_reminder_endpoint(req: ReminderCreateRequest) -> ReminderRespon
 
 
 @router.patch("/reminders/{reminder_id}/complete", response_model=ReminderResponse, tags=["Reminders"])
-async def mark_reminder_completed(reminder_id: str) -> ReminderResponse:
+async def mark_reminder_completed(reminder_id: str, _auth: Optional[str] = Depends(require_remote_session)) -> ReminderResponse:
     """Mark a local reminder as completed."""
     r = reminders_storage.complete(reminder_id.strip())
     if not r:
@@ -489,6 +496,7 @@ async def mark_reminder_completed(reminder_id: str) -> ReminderResponse:
 async def delete_reminder_endpoint(
     reminder_id: str,
     confirmation_id: Optional[str] = Query(None, description="Confirmation token for deleting the reminder."),
+    _auth: Optional[str] = Depends(require_remote_session),
 ):
     """
     Delete a local reminder. Requires explicit user confirmation.
@@ -507,7 +515,7 @@ async def delete_reminder_endpoint(
 # --- Phase 4: Memory Endpoints ---
 
 @router.get("/memories", response_model=List[MemoryResponse], tags=["Memory"])
-async def get_memories() -> List[MemoryResponse]:
+async def get_memories(_auth: Optional[str] = Depends(require_remote_session)) -> List[MemoryResponse]:
     """List all user-approved items in local persistent memory."""
     items = memory_storage.list_all()
     return [
@@ -522,7 +530,7 @@ async def get_memories() -> List[MemoryResponse]:
 
 
 @router.post("/memories", response_model=MemoryResponse, status_code=status.HTTP_201_CREATED, tags=["Memory"])
-async def add_or_update_memory(req: MemoryCreateRequest) -> MemoryResponse:
+async def add_or_update_memory(req: MemoryCreateRequest, _auth: Optional[str] = Depends(require_remote_session)) -> MemoryResponse:
     """Store or update user-approved memory with sensitive credential screening."""
     if not settings.MEMORY_ENABLED:
         raise HTTPException(
@@ -547,7 +555,7 @@ async def add_or_update_memory(req: MemoryCreateRequest) -> MemoryResponse:
 
 
 @router.delete("/memories/{key}", tags=["Memory"])
-async def delete_memory_by_key(key: str):
+async def delete_memory_by_key(key: str, _auth: Optional[str] = Depends(require_remote_session)):
     """Delete a memory item by its key."""
     deleted = memory_storage.delete(key.strip())
     if not deleted:
@@ -560,7 +568,8 @@ async def delete_memory_by_key(key: str):
 
 @router.delete("/memories", tags=["Memory"])
 async def clear_all_memories(
-    confirm: bool = Query(False, description="Set confirm=true to clear all memories.")
+    confirm: bool = Query(False, description="Set confirm=true to clear all memories."),
+    _auth: Optional[str] = Depends(require_remote_session),
 ):
     """Clear all memories from local persistent storage."""
     if not confirm:
@@ -573,7 +582,7 @@ async def clear_all_memories(
 
 
 @router.get("/memories/status", response_model=MemoryStatusResponse, tags=["Memory"])
-async def get_memory_status() -> MemoryStatusResponse:
+async def get_memory_status(_auth: Optional[str] = Depends(require_remote_session)) -> MemoryStatusResponse:
     """Get memory system status and item count."""
     return MemoryStatusResponse(
         enabled=settings.MEMORY_ENABLED,
@@ -582,7 +591,7 @@ async def get_memory_status() -> MemoryStatusResponse:
 
 
 @router.post("/memories/toggle", response_model=MemoryStatusResponse, tags=["Memory"])
-async def toggle_memory(req: MemoryToggleRequest) -> MemoryStatusResponse:
+async def toggle_memory(req: MemoryToggleRequest, _auth: Optional[str] = Depends(require_remote_session)) -> MemoryStatusResponse:
     """Enable or disable persistent memory storage."""
     settings.MEMORY_ENABLED = req.enabled
     return MemoryStatusResponse(
@@ -597,6 +606,7 @@ async def toggle_memory(req: MemoryToggleRequest) -> MemoryStatusResponse:
 async def get_briefing_endpoint(
     include_web_summary: bool = Query(False, description="Whether to include external web search results in the briefing."),
     web_topics: Optional[str] = Query(None, description="General non-personal topics to search for web overview."),
+    _auth: Optional[str] = Depends(require_remote_session),
 ):
     """
     On-demand daily briefing summarizing today's reminders, recent notes/tasks,
@@ -617,7 +627,7 @@ async def get_briefing_endpoint(
 # --- Phase 6: Google OAuth, Gmail & Google Calendar Endpoints ---
 
 @router.get("/auth/google/url", response_model=GoogleAuthUrlResponse, tags=["Google Auth"])
-async def get_google_auth_url(redirect_uri: Optional[str] = Query(None)) -> GoogleAuthUrlResponse:
+async def get_google_auth_url(redirect_uri: Optional[str] = Query(None), _auth: Optional[str] = Depends(require_remote_session)) -> GoogleAuthUrlResponse:
     """
     Generate a Google OAuth 2.0 authorization URL using PKCE (S256) and anti-CSRF state.
     User visits this URL in a browser to grant read-only Gmail and Calendar permissions.
@@ -641,6 +651,7 @@ async def google_auth_callback(
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
+    _auth: Optional[str] = Depends(require_remote_session),
 ):
     """
     OAuth 2.0 redirect callback endpoint.
@@ -683,7 +694,7 @@ async def google_auth_callback(
 
 
 @router.post("/auth/google/disconnect", response_model=GoogleDisconnectResponse, tags=["Google Auth"])
-async def disconnect_google() -> GoogleDisconnectResponse:
+async def disconnect_google(_auth: Optional[str] = Depends(require_remote_session)) -> GoogleDisconnectResponse:
     """
     Disconnect Google account: revokes tokens with Google and erases local credentials.
     """
@@ -696,7 +707,7 @@ async def disconnect_google() -> GoogleDisconnectResponse:
 
 
 @router.get("/auth/google/status", response_model=GoogleAuthStatusResponse, tags=["Google Auth"])
-async def get_google_status() -> GoogleAuthStatusResponse:
+async def get_google_status(_auth: Optional[str] = Depends(require_remote_session)) -> GoogleAuthStatusResponse:
     """
     Check current Google account connection status and storage backend.
     """
@@ -715,6 +726,7 @@ async def get_google_status() -> GoogleAuthStatusResponse:
 async def list_gmail_messages_endpoint(
     max_results: int = Query(5, ge=1, le=20, description="Max messages to retrieve."),
     query: Optional[str] = Query(None, max_length=150, description="Optional search filter."),
+    _auth: Optional[str] = Depends(require_remote_session),
 ) -> GmailListResponse:
     """
     List recent Gmail messages with metadata (Sender, Subject, Date, Snippet).
@@ -735,7 +747,7 @@ async def list_gmail_messages_endpoint(
 
 
 @router.post("/gmail/summarize", response_model=GmailSummarizeResponse, tags=["Gmail"])
-async def summarize_gmail_endpoint(req: GmailSummarizeRequest) -> GmailSummarizeResponse:
+async def summarize_gmail_endpoint(req: GmailSummarizeRequest, _auth: Optional[str] = Depends(require_remote_session)) -> GmailSummarizeResponse:
     """
     Summarize selected or recent Gmail messages using Gemini.
     Discloses that email text is sent to Gemini. Never stores email bodies in memory or logs.
@@ -766,6 +778,7 @@ async def list_calendar_events_endpoint(
     time_max: Optional[str] = Query(None, description="End datetime in ISO 8601."),
     max_results: int = Query(10, ge=1, le=25, description="Max events to retrieve."),
     calendar_id: str = Query("primary", description="Calendar identifier."),
+    _auth: Optional[str] = Depends(require_remote_session),
 ) -> CalendarListResponse:
     """
     List upcoming Google Calendar events for a date range.
@@ -792,7 +805,7 @@ async def list_calendar_events_endpoint(
 
 
 @router.post("/calendar/summarize", response_model=CalendarSummarizeResponse, tags=["Calendar"])
-async def summarize_calendar_endpoint(req: CalendarSummarizeRequest) -> CalendarSummarizeResponse:
+async def summarize_calendar_endpoint(req: CalendarSummarizeRequest, _auth: Optional[str] = Depends(require_remote_session)) -> CalendarSummarizeResponse:
     """
     Summarize Google Calendar events across a date range using Gemini.
     Discloses that event details are sent to Gemini. Never stores event titles in memory or logs.
@@ -820,13 +833,13 @@ async def summarize_calendar_endpoint(req: CalendarSummarizeRequest) -> Calendar
 # --- Phase 8: Limited Browser Automation Endpoints ---
 
 @router.get("/browser/approved-domains", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
-async def get_approved_domains() -> ApprovedDomainsResponse:
+async def get_approved_domains(_auth: Optional[str] = Depends(require_remote_session)) -> ApprovedDomainsResponse:
     """Get the current list of user-approved domains for browser automation."""
     return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains())
 
 
 @router.post("/browser/approve-domain", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
-async def approve_domain_endpoint(req: ApproveDomainRequest) -> ApprovedDomainsResponse:
+async def approve_domain_endpoint(req: ApproveDomainRequest, _auth: Optional[str] = Depends(require_remote_session)) -> ApprovedDomainsResponse:
     """Explicitly approve a domain for browser automation."""
     try:
         browser_manager.approve_domain(req.domain)
@@ -836,7 +849,7 @@ async def approve_domain_endpoint(req: ApproveDomainRequest) -> ApprovedDomainsR
 
 
 @router.post("/browser/plan-action", response_model=BrowserPlanActionResponse, tags=["Browser Automation"])
-async def plan_browser_action(req: BrowserPlanActionRequest) -> BrowserPlanActionResponse:
+async def plan_browser_action(req: BrowserPlanActionRequest, _auth: Optional[str] = Depends(require_remote_session)) -> BrowserPlanActionResponse:
     """
     Validate and stage a low-risk browser action.
     Enforces domain restrictions, sensitive-field exclusion, and forbidden action rules.
@@ -950,14 +963,14 @@ async def plan_browser_action(req: BrowserPlanActionRequest) -> BrowserPlanActio
 # --- Phase 9: User Data Controls, Backup & Recovery Endpoints ---
 
 @router.get("/data/locations", response_model=DataLocationsResponse, tags=["Data Management"])
-async def get_data_locations_endpoint() -> DataLocationsResponse:
+async def get_data_locations_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> DataLocationsResponse:
     """View all local filesystem paths where user data is stored."""
     locs = user_data_manager.get_data_locations()
     return DataLocationsResponse(**locs)
 
 
 @router.get("/data/export", response_model=DataExportResponse, tags=["Data Management"])
-async def export_user_data_endpoint() -> DataExportResponse:
+async def export_user_data_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> DataExportResponse:
     """
     Export all user-owned notes, memories, and reminders in clean JSON format.
     Strictly excludes secrets, API keys, and credentials.
@@ -967,7 +980,7 @@ async def export_user_data_endpoint() -> DataExportResponse:
 
 
 @router.post("/data/clear", response_model=DataClearResponse, tags=["Data Management"])
-async def clear_all_data_endpoint(req: DataClearRequest) -> DataClearResponse:
+async def clear_all_data_endpoint(req: DataClearRequest, _auth: Optional[str] = Depends(require_remote_session)) -> DataClearResponse:
     """
     Permanently wipe all user notes, memories, reminders, and screenshot images.
     Requires confirm=true and confirmation_text='DELETE ALL DATA'.
@@ -983,14 +996,14 @@ async def clear_all_data_endpoint(req: DataClearRequest) -> DataClearResponse:
 
 
 @router.get("/data/backups", response_model=BackupListResponse, tags=["Data Management"])
-async def list_backups_endpoint() -> BackupListResponse:
+async def list_backups_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> BackupListResponse:
     """List all available local backup snapshots with verification status."""
     backups = user_data_manager.list_backups()
     return BackupListResponse(count=len(backups), backups=backups)
 
 
 @router.post("/data/backup", response_model=BackupCreateResponse, tags=["Data Management"])
-async def create_backup_endpoint(req: BackupCreateRequest = BackupCreateRequest()) -> BackupCreateResponse:
+async def create_backup_endpoint(req: BackupCreateRequest = BackupCreateRequest(), _auth: Optional[str] = Depends(require_remote_session)) -> BackupCreateResponse:
     """
     Create a local validated backup snapshot of notes, reminders, and memories
     with a SHA-256 integrity checksum. Does NOT include secrets or credentials.
@@ -1000,7 +1013,7 @@ async def create_backup_endpoint(req: BackupCreateRequest = BackupCreateRequest(
 
 
 @router.post("/data/restore", response_model=BackupRestoreResponse, tags=["Data Management"])
-async def restore_backup_endpoint(req: BackupRestoreRequest) -> BackupRestoreResponse:
+async def restore_backup_endpoint(req: BackupRestoreRequest, _auth: Optional[str] = Depends(require_remote_session)) -> BackupRestoreResponse:
     """
     Safely restore user data from a local backup file after checksum validation.
     Requires confirm_overwrite=true if existing data is present.
@@ -1020,21 +1033,21 @@ async def restore_backup_endpoint(req: BackupRestoreRequest) -> BackupRestoreRes
 # --- Phase 10: End-to-End Demo Mode Endpoints ---
 
 @router.get("/demo/status", response_model=DemoStatusResponse, tags=["Demo"])
-async def get_demo_status_endpoint() -> DemoStatusResponse:
+async def get_demo_status_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> DemoStatusResponse:
     """Returns the current status, links, and step-by-step instructions for Phase 10 Demo."""
     st = demo_manager.get_status()
     return DemoStatusResponse(**st)
 
 
 @router.post("/demo/seed", response_model=DemoActionResponse, tags=["Demo"])
-async def seed_demo_data_endpoint() -> DemoActionResponse:
+async def seed_demo_data_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> DemoActionResponse:
     """Seeds fictional mock notes, reminders, and memory tagged with '[DEMO]'."""
     res = demo_manager.seed_demo_data()
     return DemoActionResponse(**res)
 
 
 @router.post("/demo/reset", response_model=DemoActionResponse, tags=["Demo"])
-async def clear_demo_data_endpoint() -> DemoActionResponse:
+async def clear_demo_data_endpoint(_auth: Optional[str] = Depends(require_remote_session)) -> DemoActionResponse:
     """One-step deletion of mock/demo data without touching real user files or records."""
     res = demo_manager.clear_demo_data()
     return DemoActionResponse(**res)
