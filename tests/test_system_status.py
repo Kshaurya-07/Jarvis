@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -8,6 +9,7 @@ from app.tools.system_status_tools import (
 )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_battery_status_desktop_no_battery():
     with patch("psutil.sensors_battery", return_value=None):
         result = get_battery_status()
@@ -16,6 +18,7 @@ def test_battery_status_desktop_no_battery():
         assert "No battery detected" in result.output["summary"]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_battery_status_laptop_charging():
     mock_battery = MagicMock()
     mock_battery.percent = 85.5
@@ -31,6 +34,7 @@ def test_battery_status_laptop_charging():
         assert "plugged in" in result.output["summary"]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_battery_status_laptop_discharging():
     mock_battery = MagicMock()
     mock_battery.percent = 45.0
@@ -45,6 +49,7 @@ def test_battery_status_laptop_discharging():
         assert "1h 30m" in result.output["time_remaining"]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_storage_status_valid_drive():
     mock_usage = MagicMock()
     mock_usage.total = 500 * (1024 ** 3)
@@ -61,12 +66,14 @@ def test_storage_status_valid_drive():
         assert result.output["percent_used"] == 40.0
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_storage_status_invalid_drive_format():
     result = get_storage_status(drive="invalid_drive")
     assert result.success is False
     assert "Invalid drive specification" in result.error
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_storage_status_nonexistent_drive():
     with patch("psutil.disk_usage", side_effect=FileNotFoundError("Drive not found")):
         result = get_storage_status(drive="Z:")
@@ -74,6 +81,7 @@ def test_storage_status_nonexistent_drive():
         assert "was not found" in result.error
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only system-status tool")
 def test_memory_status_success():
     mock_mem = MagicMock()
     mock_mem.total = 16 * (1024 ** 3)
