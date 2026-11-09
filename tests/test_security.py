@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 import pytest
 
@@ -33,6 +34,7 @@ def test_resolve_safe_path_traversal_attack(tmp_path: Path):
         resolve_safe_path(tmp_path, "subdir/../../outside.txt", must_exist=False)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows drive-letter paths are legal relative paths on POSIX")
 def test_resolve_safe_path_absolute_drive_escape(tmp_path: Path):
     with pytest.raises(SecurityViolationError):
         resolve_safe_path(tmp_path, "C:/Windows/System32/cmd.exe", must_exist=False)
