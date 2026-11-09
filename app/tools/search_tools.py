@@ -71,7 +71,7 @@ async def execute_web_search(query: str, max_results: int = 5) -> ToolResult:
     # 5. Dispatch to official search provider
     try:
         timeout = httpx.Timeout(settings.SEARCH_TIMEOUT_SECONDS)
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
             if provider == "google_custom_search":
                 return await _search_google_custom(client, clean_query, clamped_count, api_key.strip())
             elif provider == "brave":
