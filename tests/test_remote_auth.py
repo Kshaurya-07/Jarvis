@@ -248,6 +248,41 @@ def test_host_header_tailscale_allowed_and_unauthorized_rejected(client: TestCli
     assert "Host 'attacker.com' is not authorized" in bad_host_resp.json()["detail"]
 
 
+def test_remote_origin_requires_session_token_for_data_endpoints(client: TestClient):
+    """Regression test (critical fix): remote requests without a session token
+    must be rejected with 401 on data/memory/gmail endpoints, not just /api/chat."""
+    remote_headers = {"Origin": PROD_ORIGIN}
+    for method, url in [
+        ("GET", "/api/memories"),
+        ("GET", "/api/data/export"),
+        ("GET", "/api/gmail/messages"),
+        ("GET", "/api/reminders"),
+        ("GET", "/api/calendar/events"),
+        ("POST", "/api/data/clear"),
+        ("POST", "/api/browser/approve-domain"),
+        ("GET", "/api/briefing"),
+    ]:
+        kwargs = {"headers": remote_headers}
+        if method == "POST" and "clear" in url:
+            kwargs["json"] = {"confirm": True, "confirmation_text": "DELETE ALL DATA"}
+        elif method == "POST":
+            kwargs["json"] = {"domain": "example.com"}
+        resp = client.request(method, url, **kwargs)
+        assert resp.status_code == 401, f"{method} {url} returned {resp.status_code}, expected 401"
+        assert "Remote authentication required" in resp.json()["detail"]
+
+    # With a valid session token the same endpoints succeed (memories: 200, empty list)
+    code = remote_session_manager.generate_pairing_code()
+    session = remote_session_manager.exchange_pairing_code(code, "127.0.0.1")
+    auth_headers = {"Origin": PROD_ORIGIN, "Authorization": f"Bearer {session.token}"}
+    ok_resp = client.get("/api/memories", headers=auth_headers)
+    assert ok_resp.status_code == 200
+
+    # Public endpoints stay public remotely: /health and /remote/session/status
+    assert client.get("/health", headers=remote_headers).status_code == 200
+    assert client.get("/api/remote/session/status", headers=remote_headers).status_code == 200
+
+
 def test_remote_stop_endpoint(client: TestClient):
     """Remote stop endpoint promptly halts active tasks."""
     code = remote_session_manager.generate_pairing_code()
