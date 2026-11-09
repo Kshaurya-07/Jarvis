@@ -1,4 +1,5 @@
 import json
+import sys
 import time
 from unittest.mock import MagicMock, patch
 import pytest
@@ -92,6 +93,7 @@ def test_expired_state_rejected(monkeypatch):
     assert "expired" in str(err.value).lower()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Requires a usable OS credential store (keyring), unavailable on Linux CI")
 def test_token_exchange_mocked(monkeypatch):
     """Verify OAuth code exchange uses PKCE verifier and stores tokens."""
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id")
@@ -175,6 +177,7 @@ def test_storage_fallback_when_opted_in(monkeypatch, tmp_path):
                 assert loaded["account_email"] == "optin@example.com"
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Requires a usable OS credential store (keyring), unavailable on Linux CI")
 def test_disconnect_and_revoke():
     """Verify disconnect revokes token with Google and cleans local credentials."""
     stored = {
@@ -207,6 +210,7 @@ def test_disconnect_and_revoke():
                 assert "https://oauth2.googleapis.com/revoke" in mock_post.call_args[0][0]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Requires a usable OS credential store (keyring), unavailable on Linux CI")
 def test_auth_status_disconnected_and_connected():
     """Verify status reports connection state, scopes, and storage backend."""
     # Disconnected state
