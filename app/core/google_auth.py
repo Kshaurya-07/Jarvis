@@ -155,7 +155,7 @@ class GoogleAuthManager:
             data["client_secret"] = settings.GOOGLE_CLIENT_SECRET
 
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(trust_env=False, timeout=10.0) as client:
                 resp = client.post("https://oauth2.googleapis.com/token", data=data)
                 if resp.status_code != 200:
                     err_json = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
@@ -366,7 +366,7 @@ class GoogleAuthManager:
         revoked_remotely = False
         if token_to_revoke:
             try:
-                with httpx.Client(timeout=5.0) as client:
+                with httpx.Client(trust_env=False, timeout=5.0) as client:
                     resp = client.post(
                         "https://oauth2.googleapis.com/revoke",
                         params={"token": token_to_revoke},
