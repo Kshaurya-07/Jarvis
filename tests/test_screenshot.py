@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from PIL import Image
@@ -8,6 +9,7 @@ from app.core.confirmation import confirmation_manager
 from app.tools.screenshot_tools import capture_screenshot, analyze_screenshot
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only screenshot tool")
 def test_capture_screenshot_requires_confirmation():
     result = capture_screenshot()
     assert result.success is False
@@ -16,6 +18,7 @@ def test_capture_screenshot_requires_confirmation():
     assert "confirmation_id" in result.output
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only screenshot tool")
 def test_capture_screenshot_success(tmp_path: Path, monkeypatch):
     test_screenshots_dir = tmp_path / "screenshots"
     test_screenshots_dir.mkdir(parents=True, exist_ok=True)
@@ -40,6 +43,7 @@ def test_capture_screenshot_success(tmp_path: Path, monkeypatch):
         assert saved_file.parent == test_screenshots_dir
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only screenshot tool")
 def test_capture_screenshot_display_unavailable():
     res1 = capture_screenshot()
     conf_id = res1.output["confirmation_id"]
@@ -51,6 +55,7 @@ def test_capture_screenshot_display_unavailable():
         assert "Display session locked" in res2.error
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only screenshot tool")
 def test_analyze_screenshot_requires_confirmation(tmp_path: Path, monkeypatch):
     test_screenshots_dir = tmp_path / "screenshots"
     test_screenshots_dir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +72,7 @@ def test_analyze_screenshot_requires_confirmation(tmp_path: Path, monkeypatch):
     assert "confirmation_id" in result.output
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only screenshot tool")
 def test_analyze_screenshot_with_confirmation(tmp_path: Path, monkeypatch):
     test_screenshots_dir = tmp_path / "screenshots"
     test_screenshots_dir.mkdir(parents=True, exist_ok=True)
