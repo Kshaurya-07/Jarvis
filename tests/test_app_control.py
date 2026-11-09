@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -5,18 +6,21 @@ from app.core.confirmation import confirmation_manager
 from app.tools.app_control_tools import open_application, ALLOWED_APPLICATIONS
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
 def test_open_app_not_in_allowlist():
     result = open_application("powershell")
     assert result.success is False
     assert "not in the server-side allowlist" in result.error
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
 def test_open_app_arbitrary_path_rejected():
     result = open_application("C:\\Windows\\System32\\cmd.exe /c calc")
     assert result.success is False
     assert "not in the server-side allowlist" in result.error
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
 def test_open_app_requires_confirmation():
     result = open_application("calculator")
     assert result.success is False
@@ -26,6 +30,7 @@ def test_open_app_requires_confirmation():
     assert result.output["app_name"] == "calculator"
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
 def test_open_app_with_confirmed_token():
     # 1. Trigger pending action
     res1 = open_application("notepad")
@@ -45,6 +50,7 @@ def test_open_app_with_confirmed_token():
         mock_popen.assert_called_once_with(["notepad.exe"], shell=False)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
 def test_open_app_cannot_reuse_confirmation_token():
     res1 = open_application("notepad")
     conf_id = res1.output["confirmation_id"]
