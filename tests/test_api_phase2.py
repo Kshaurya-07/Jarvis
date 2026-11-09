@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -29,6 +30,7 @@ def test_list_tools_phase2(client):
     assert "analyze_screenshot" in tool_names
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool (open_application)")
 def test_confirm_flow_via_api(client):
     # 1. Create a pending action
     action = confirmation_manager.create_pending_action(
