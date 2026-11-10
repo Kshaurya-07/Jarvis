@@ -10,7 +10,6 @@ from app.core.google_auth import (
     GoogleAuthManager,
     GoogleConfigError,
     GoogleAuthError,
-    GoogleTokenRevokedError,
     KEYRING_SERVICE_NAME,
     KEYRING_USERNAME,
 )
