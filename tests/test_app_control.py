@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.core.confirmation import confirmation_manager
-from app.tools.app_control_tools import open_application, ALLOWED_APPLICATIONS
+from app.tools.app_control_tools import open_application
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only app-control tool")
