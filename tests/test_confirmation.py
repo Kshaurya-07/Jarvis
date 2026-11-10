@@ -1,5 +1,4 @@
 import time
-import pytest
 
 from app.core.confirmation import ConfirmationManager
 
@@ -15,6 +14,9 @@ def test_confirmation_lifecycle():
     )
     conf_id = action.confirmation_id
     assert conf_id.startswith("conf_")
+    # token_hex(16): 32 hex chars, 128 bits of entropy.
+    assert len(conf_id) == len("conf_") + 32
+    assert all(c in "0123456789abcdef" for c in conf_id[len("conf_"):])
 
     # 2. Before approval: consumption should fail
     assert mgr.validate_and_consume(conf_id, "open_application", {"app_name": "notepad"}) is False
