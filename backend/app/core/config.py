@@ -33,16 +33,16 @@ class Settings(BaseSettings):
     ALLOW_REMOTE_ACCESS: bool = False  # Strictly local-only by default
 
     # --- Cloud-first mode (Phase 12) -------------------------------------
-    # CLOUD_MODE=true is the default on Render (see render.yaml): the backend
-    # listens on 0.0.0.0, Google sign-in is mandatory for every AI/data
-    # endpoint, and all user data is namespaced per Google account. Local
+    # CLOUD_MODE=true is how the backend runs on Vercel serverless:
+    # Google sign-in is mandatory for every AI/data endpoint, and all user
+    # data is namespaced per Google account. Local
     # mode (CLOUD_MODE=false, the default) keeps the old behaviour: loopback
     # requests from the owner's own laptop are trusted without sign-in, so
     # local development and the existing test suite keep working.
     CLOUD_MODE: bool = False
     # Secret used to sign Jarvis session JWTs (HS256) and, as a fallback, to
     # derive the BYOK encryption key. REQUIRED in cloud mode; generate a
-    # long random value (Render generates one via generateValue). Never
+    # long random value. Never
     # commit it, never log it. Rotating it signs everyone out and makes
     # previously stored BYOK keys undecryptable (users re-enter their key).
     SESSION_SECRET: Optional[str] = None
@@ -142,12 +142,23 @@ class Settings(BaseSettings):
         self.GOOGLE_FALLBACK_TOKEN_FILE = self.GOOGLE_FALLBACK_TOKEN_FILE.resolve()
         self.ACTION_LOG_FILE = self.ACTION_LOG_FILE.resolve()
 
-        self.WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
-        self.NOTES_DIR.mkdir(parents=True, exist_ok=True)
-        self.SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        self.BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-        self.ACTION_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # Best-effort only: Vercel serverless functions run on a read-only
+        # filesystem (only /tmp is writable), and the local data dirs are
+        # not in the deployment at all. Creating them must never crash the
+        # import — in cloud mode all user data lives in Postgres anyway.
+        # Locally these mkdirs succeed exactly as before.
+        for _d in (
+            self.WORKSPACE_DIR,
+            self.NOTES_DIR,
+            self.SCREENSHOTS_DIR,
+            self.DATA_DIR,
+            self.BACKUPS_DIR,
+            self.ACTION_LOG_FILE.parent,
+        ):
+            try:
+                _d.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
 
     def validate_configuration(self) -> list[str]:
         """
@@ -166,7 +177,7 @@ class Settings(BaseSettings):
                 "unauthorized network access. Set ALLOW_REMOTE_ACCESS=true to explicitly override."
             )
 
-        # 1b. Cloud mode: 0.0.0.0 is expected (Render), but sign-in must be
+        # 1b. Cloud mode: sign-in must be
         # possible — a missing/short SESSION_SECRET is a loud warning, not a
         # fatal error, so local smoke tests can still boot without one.
         if self.CLOUD_MODE:
@@ -183,11 +194,9 @@ class Settings(BaseSettings):
                     "Vercel serverless — set DATABASE_URL (Neon Postgres) before "
                     "deploying, or data will be lost between invocations."
                 )
-            if self.HOST in loopback_hosts:
-                warnings.append(
-                    "Warning: CLOUD_MODE is on but HOST is still a loopback address; "
-                    "on Render HOST must be 0.0.0.0 or the service will not be reachable."
-                )
+            # NOTE: no HOST check here. On Vercel serverless the platform
+            # owns the listener — HOST binding does not apply — so a
+            # loopback HOST default is expected and must not warn.
 
         # 2. Port validation
         if not (1 <= self.PORT <= 65535):

@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Network & Option B / Tailscale Verification ---
+  // --- Legacy network verification (local mode / Tailscale pairing) ---
   const isLocalhostHost = (
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1" ||

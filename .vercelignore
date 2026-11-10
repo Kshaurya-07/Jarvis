@@ -1,9 +1,13 @@
 # ==============================================================================
 # Jarvis - Vercel Deployment Ignore Rules (.vercelignore)
 # ==============================================================================
-# Note: .vercelignore is NOT a security guarantee. It only applies to Vercel CLI
-# deployments; Git-based deployments (e.g. GitHub integration) bypass this file.
-# Secrets and private data must never be committed to source control.
+# NOTE: .vercelignore applies to the deployment upload for Git-based
+# deployments too (Vercel clones the repo, then applies these exclusions) —
+# anything listed here is NOT in the deployment. In particular, do NOT
+# exclude backend/app/: api/index.py imports it (from app.main import app),
+# so excluding it makes every /api/* invocation fail with
+# ModuleNotFoundError. Secrets and private data must never be committed
+# to source control; this file only trims files the deployment does not need.
 # ==============================================================================
 
 # 1. Environment & Configuration Files (exclude all .env variants)
@@ -43,9 +47,11 @@ __pycache__/
 *$py.class
 *.so
 
-# 4. Backend Application Code & Local Server Configurations
-# The backend is built strictly for local loopback execution (127.0.0.1:8000).
-backend/app/
+# 4. Backend Local Server Configurations (NOT the app code itself)
+# backend/app/ is the Vercel serverless function code (api/index.py imports
+# it) and must be deployed. Only the local-only scripts, the duplicate
+# requirements file (api/requirements.txt is what Vercel installs), and
+# test config are excluded.
 backend/scripts/
 backend/requirements.txt
 pytest.ini

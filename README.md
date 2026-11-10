@@ -259,6 +259,9 @@ saved the same way (Settings → Your Gemini key).
 3. Pin **Jarvis Local Companion** to the toolbar and click **Read this page**
    on a tab you want summarised.
 
+   > Note: the extension talks to a local backend (`http://127.0.0.1:8000`) —
+   > it does not use the cloud backend yet.
+
 ### Mobile PWA
 
 With the backend running, open `http://127.0.0.1:8000/mobile/` in a

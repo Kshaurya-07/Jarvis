@@ -298,8 +298,26 @@ def test_vercel_entrypoint_and_config():
     assert module.app.title.startswith("Jarvis")
     vercel = json.loads((repo_root / "vercel.json").read_text())
     rewrites = vercel["rewrites"]
-    assert rewrites[0] == {"source": "/api/(.*)", "destination": "/api/index.py"}
+    # /api/* must route to the function by its extension-less route (/api/index).
+    # Destination "/api/index.py" does NOT resolve: live, /api/health 404'd
+    # while /api itself invoked the function (500) — the .py destination
+    # matches no route. Source uses the documented :path* wildcard.
+    assert rewrites[0] == {"source": "/api/:path*", "destination": "/api/index"}
+    assert not any(r["destination"].endswith(".py") for r in rewrites)
     assert vercel["functions"]["api/index.py"]["maxDuration"] == 10
+    # Other rewrites must exist too: /companion and /companion/ serve the
+    # Companion PWA, /landing and /demo serve their static pages.
+    by_source = {r["source"]: r["destination"] for r in rewrites}
+    assert by_source["/companion"] == "/mobile/index.html"
+    assert by_source["/companion/"] == "/mobile/index.html"
+    assert by_source["/landing"] == "/landing/index.html"
+    assert by_source["/demo"] == "/demo/index.html"
+    # backend/app/ must be deployed: api/index.py does `from app.main import
+    # app`. If .vercelignore excluded it, every invocation would fail with
+    # ModuleNotFoundError (live symptom: /api -> 500 FUNCTION_INVOCATION_FAILED).
+    vercelignore = (repo_root / ".vercelignore").read_text().splitlines()
+    ignored = {ln.strip() for ln in vercelignore if ln.strip() and not ln.strip().startswith("#")}
+    assert "backend/app/" not in ignored
 
 
 class _FakeCursor:

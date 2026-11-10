@@ -50,17 +50,17 @@
       .then(function (resp) {
         clearTimeout(timer);
         if (resp.ok) {
-          setStatus("ok", "Local Jarvis backend detected on this device.");
+          setStatus("ok", "Cloud backend is up — sign in to start.");
         } else {
-          setStatus("off", "No Jarvis backend detected here — start it on your laptop, then pair your phone.");
+          setStatus("off", "Cloud backend not reachable right now — try again in a moment.");
         }
       })
       .catch(function () {
         clearTimeout(timer);
-        setStatus("off", "No Jarvis backend detected here — start it on your laptop, then pair your phone.");
+        setStatus("off", "Cloud backend not reachable right now — try again in a moment.");
       });
   } catch (e) {
-    setStatus("off", "Backend status unavailable — start Jarvis on your laptop, then pair your phone.");
+    setStatus("off", "Backend status unavailable — try again in a moment.");
   }
 
   // ---- Unified per-pixel scroll + pointer engine (transform/opacity only). ----
@@ -286,37 +286,37 @@
   // ---- Simulated demo: scripted, browser-only, clearly labelled. ----
   var scenarios = {
     file: {
-      command: "\u201CLaptop par yeh file kholo aur summarize karo.\u201D",
+      command: "\u201CMeri file summarize karo.\u201D",
       branchNote: "Branch A — reading a file inside the approved workspace.",
       steps: [
-        "Phone sends the command to the paired laptop.",
+        "Phone sends the command to the cloud.",
         "Jarvis checks the file is inside your approved workspace.",
         "Jarvis reads the file and explains the plan before acting.",
-        "Summary prepared on the laptop and sent back to your phone."
+        "Summary prepared in the cloud and sent back to your phone."
       ],
-      result: "Result (simulated): the file was summarised on your laptop. In the real companion, the summary would appear in your chat with a note of which file was read."
+      result: "Result (simulated): the file was summarised in the cloud. In the real companion, the summary would appear in your chat with a note of which file was read."
     },
     website: {
-      command: "\u201CLaptop par yeh website kholo.\u201D",
+      command: "\u201CYeh website kholo aur summarize karo.\u201D",
       branchNote: "Branch B — the domain is checked against your approved list first.",
       steps: [
-        "Phone sends the command to the paired laptop.",
+        "Phone sends the command to the cloud.",
         "Jarvis checks the website's domain against your approved list.",
-        "Domain is approved, so Jarvis opens it in the laptop browser.",
-        "Jarvis confirms the page opened and offers a summary."
+        "Domain is approved, so Jarvis reads the page.",
+        "Jarvis confirms and offers a summary."
       ],
-      result: "Result (simulated): the website opened on your laptop. If the domain were not approved, Jarvis would ask you to approve it first instead of opening it."
+      result: "Result (simulated): the website was read in the cloud. If the domain were not approved, Jarvis would ask you to approve it first instead of opening it."
     },
     reminder: {
       command: "\u201CMere phone par reminder set karo.\u201D",
       branchNote: "Branch C — phone-side actions are not built yet, so this path stops honestly.",
       steps: [
-        "Phone sends the command to the paired laptop.",
-        "Jarvis understands the target is your phone, not the laptop.",
+        "Phone sends the command to the cloud.",
+        "Jarvis understands the target is your phone, not the cloud.",
         "Phone-side actions are not built yet, so Jarvis cannot set the reminder there.",
-        "Jarvis explains this honestly and offers the laptop reminder instead."
+        "Jarvis explains this honestly and offers a cloud reminder instead."
       ],
-      result: "Result (simulated): not available yet. This is the planned laptop-to-phone direction on the roadmap — Jarvis says so instead of pretending it worked.",
+      result: "Result (simulated): not available yet. This is the planned cloud-to-phone direction on the roadmap — Jarvis says so instead of pretending it worked.",
       warn: true
     }
   };
@@ -342,7 +342,7 @@
     clearTimers();
     running = false;
     if (runBtn) runBtn.disabled = false;
-    if (logEl) logEl.innerHTML = '<li class="demo-log-empty">No command yet. Choose one and press \u201CSend to laptop\u201D.</li>';
+    if (logEl) logEl.innerHTML = '<li class="demo-log-empty">No command yet. Choose one and press \u201CSend to the cloud\u201D.</li>';
     if (resultEl) { resultEl.hidden = true; resultEl.textContent = ""; }
     if (noteEl) noteEl.textContent = message || "Ready. Nothing has been sent anywhere.";
   }
@@ -448,9 +448,9 @@
 
   // ---- Developers: code tabs, typing effect, real copy button. ----
   var codeSamples = {
-    curl: "curl http://localhost:8000/api/health\n\n# {\"status\": \"ok\", ...}\n# No key needed — the health check is public on localhost.",
-    python: "import httpx\n\nresp = httpx.get(\"http://localhost:8000/api/health\", timeout=5)\nprint(resp.json())  # {\"status\": \"ok\", ...}",
-    typescript: "const resp = await fetch(\"http://localhost:8000/api/health\");\nconst health = await resp.json();\nconsole.log(health); // { status: \"ok\", ... }"
+    curl: "curl https://jarvis-kumar-shaurya.vercel.app/api/health\n\n# {\"status\": \"ok\", ...}\n# No key needed — the health check is public.",
+    python: "import httpx\n\nresp = httpx.get(\"https://jarvis-kumar-shaurya.vercel.app/api/health\", timeout=5)\nprint(resp.json())  # {\"status\": \"ok\", ...}",
+    typescript: "const resp = await fetch(\"https://jarvis-kumar-shaurya.vercel.app/api/health\");\nconst health = await resp.json();\nconsole.log(health); // { status: \"ok\", ... }"
   };
   var codeBtns = Array.prototype.slice.call(document.querySelectorAll(".code-tabs .tab-btn[data-code]"));
   var codeText = document.getElementById("code-text");
@@ -480,7 +480,7 @@
         b.setAttribute("aria-selected", active ? "true" : "false");
       });
       typeCode(activeCode);
-      if (copyNote) copyNote.textContent = "Health check against the backend on your own laptop. No key needed for /api/health.";
+      if (copyNote) copyNote.textContent = "Health check against the cloud backend. No key needed for /api/health.";
       if (copyBtn) copyBtn.textContent = "Copy code";
     });
   });

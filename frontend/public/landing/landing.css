@@ -350,6 +350,7 @@ html.js .bar.is-visible span, html.js .is-visible .bar span { width: var(--w, 50
 .badge-permission { color: var(--warn); border-color: rgba(232, 200, 122, 0.4); }
 .badge-indev { color: var(--accent); border-color: rgba(183, 166, 245, 0.45); }
 .badge-planned { color: var(--muted); }
+.badge-local { color: var(--muted); border-color: rgba(160, 157, 148, 0.45); }
 .sim-tag {
   font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--warn);
