@@ -10,7 +10,10 @@ def test_health_check_phase2(client):
     assert response.status_code == 200
     data = response.json()
     assert "platform" in data
-    assert "screenshots_directory" in data
+    # /health must not leak absolute filesystem paths (see routes.py).
+    assert "workspace_directory" not in data
+    assert "notes_directory" not in data
+    assert "screenshots_directory" not in data
     assert "open_application" in data["active_tools"]
     assert "get_battery_status" in data["active_tools"]
     assert "get_storage_status" in data["active_tools"]
