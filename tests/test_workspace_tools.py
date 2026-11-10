@@ -1,5 +1,3 @@
-from pathlib import Path
-import pytest
 
 from app.core.config import settings
 from app.tools.workspace_tools import list_files, read_text_file
