@@ -1,4 +1,3 @@
-import pytest
 
 from app.core.config import settings
 from app.tools.memory_tools import (
@@ -49,8 +48,8 @@ def test_sensitive_data_detection():
 
     # API Keys & Tokens
     assert detect_sensitive_data("api_key = 'abcdef1234567890abcdef'") is not None
-    assert detect_sensitive_data("sk-123456789012345678901234567890") is not None
-    assert detect_sensitive_data("ghp_1234567890abcdef1234567890abcdef") is not None
+    assert detect_sensitive_data("api_key = 'TEST-FAKE-KEY-1234567890'") is not None
+    assert detect_sensitive_data("Bearer TEST-FAKE-TOKEN-123456789012345") is not None
 
     # Credit cards
     assert detect_sensitive_data("card number 4111 2222 3333 4444") is not None
@@ -64,7 +63,7 @@ def test_remember_rejects_sensitive_data():
     assert res1.success is False
     assert "Privacy refusal" in res1.error
 
-    res2 = remember_item(key="cloud_key", content="sk-123456789012345678901234567890")
+    res2 = remember_item(key="cloud_key", content="api_key = 'TEST-FAKE-KEY-1234567890'")
     assert res2.success is False
     assert "Privacy refusal" in res2.error
 
