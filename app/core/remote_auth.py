@@ -14,7 +14,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.core.logger import app_logger
