@@ -6,6 +6,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlencode
 import httpx
 import keyring
 
@@ -112,8 +113,8 @@ class GoogleAuthManager:
             "code_challenge_method": "S256",
         }
 
-        query_parts = [f"{k}={httpx.URL('', params={k: v}).query.decode('utf-8')}" for k, v in params.items()]
-        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{'&'.join(query_parts)}"
+        query = urlencode(params)
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
         return auth_url, state
 
     # -- Phase 12: Google sign-in (login), separate from Gmail/Calendar --
@@ -145,8 +146,8 @@ class GoogleAuthManager:
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
         }
-        query_parts = [f"{k}={httpx.URL('', params={k: v}).query.decode('utf-8')}" for k, v in params.items()]
-        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{'&'.join(query_parts)}"
+        query = urlencode(params)
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
         return auth_url, state, code_verifier, redirect_uri
 
     def exchange_login_code(self, code: str, code_verifier: str, redirect_uri: str) -> Dict[str, Any]:

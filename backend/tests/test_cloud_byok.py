@@ -85,6 +85,98 @@ def test_login_url_returns_google_url_with_login_scopes(monkeypatch):
         assert "jarvis_oauth_state" in resp.cookies
 
 
+def _assert_well_formed_google_auth_url(url: str, expected: dict):
+    """Regression guard for the doubled-params bug (live Google 400, 2026-11-11).
+
+    The old builder did ``f"{k}={httpx.URL('', params={k: v}).query}"`` —
+    ``httpx.URL(...).query`` already yields the full ``k=v`` pair, so every
+    key was doubled (``client_id=client_id=...``) and Google rejected the
+    URL as malformed. Parse the query and require each expected parameter
+    exactly once, with the right value, and no key containing '='.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    parsed = urlparse(url)
+    assert parsed.scheme == "https"
+    assert parsed.netloc == "accounts.google.com"
+    assert parsed.path == "/o/oauth2/v2/auth"
+    # No doubled keys anywhere in the raw query string.
+    for doubled in (
+        "client_id=client_id",
+        "redirect_uri=redirect_uri",
+        "response_type=response_type",
+        "scope=scope",
+        "access_type=access_type",
+        "prompt=prompt",
+        "state=state",
+        "code_challenge=code_challenge",
+        "code_challenge_method=code_challenge_method",
+    ):
+        assert doubled not in parsed.query, doubled
+    qs = parse_qs(parsed.query)
+    assert not any("=" in key for key in qs), qs
+    for key, value in expected.items():
+        assert qs.get(key) == [value], (key, qs.get(key))
+    # No unexpected parameters sneaked in.
+    assert set(qs) == set(expected)
+
+
+def test_login_auth_url_has_no_doubled_params(monkeypatch):
+    """Live bug: /api/auth/login returned client_id=client_id=... (Google 400)."""
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_SECRET", "test-secret")
+    with TestClient(app) as client:
+        resp = client.get("/api/auth/login?format=json")
+        assert resp.status_code == 200
+        url = resp.json()["auth_url"]
+        state = resp.json()["state"]
+        from urllib.parse import parse_qs as _pq, urlparse as _up
+
+        parsed_qs = _pq(_up(url).query)
+        _assert_well_formed_google_auth_url(
+            url,
+            {
+                "client_id": "test-client-id.apps.googleusercontent.com",
+                "redirect_uri": settings.GOOGLE_LOGIN_REDIRECT_URI,
+                "response_type": "code",
+                "scope": "openid email profile",
+                "access_type": "online",
+                "prompt": "select_account",
+                "state": state,
+                "code_challenge": parsed_qs["code_challenge"][0],
+                "code_challenge_method": "S256",
+            },
+        )
+        assert len(parsed_qs["state"]) == 1 and parsed_qs["state"][0]
+        assert len(parsed_qs["code_challenge"]) == 1 and parsed_qs["code_challenge"][0]
+
+
+def test_gmail_auth_url_has_no_doubled_params(monkeypatch):
+    """Same doubled-params bug lived in the Gmail/Calendar URL builder too."""
+    from urllib.parse import parse_qs, urlparse
+
+    from app.core.google_auth import google_auth_manager
+
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
+    url, state = google_auth_manager.create_authorization_url()
+    parsed_qs = parse_qs(urlparse(url).query)
+    _assert_well_formed_google_auth_url(
+        url,
+        {
+            "client_id": "test-client-id.apps.googleusercontent.com",
+            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            "response_type": "code",
+            "scope": " ".join(settings.GOOGLE_OAUTH_SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": state,
+            "code_challenge": parsed_qs["code_challenge"][0],
+            "code_challenge_method": "S256",
+        },
+    )
+    assert "gmail.readonly" in parsed_qs["scope"][0]
+
+
 def test_login_callback_mints_session_and_me_works(monkeypatch):
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
     fake_identity = {"sub": "google-sub-user-a", "email": "a@example.com", "name": "User A"}
