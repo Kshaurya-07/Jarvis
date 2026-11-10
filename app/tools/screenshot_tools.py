@@ -1,6 +1,5 @@
 import datetime
 from pathlib import Path
-import sys
 from typing import Any, Dict, Optional
 from PIL import Image
 
@@ -208,7 +207,6 @@ def analyze_screenshot(
 
     # Perform analysis with Gemini
     try:
-        from google import genai
         from google.genai import types
         from app.services.agent_service import agent_service
 
