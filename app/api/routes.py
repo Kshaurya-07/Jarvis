@@ -70,8 +70,6 @@ from app.core.google_auth import (
     google_auth_manager,
     GoogleConfigError,
     GoogleAuthError,
-    GoogleAuthRequiredError,
-    GoogleTokenRevokedError,
 )
 from app.core.logger import action_logger, ActionLogEntry
 from app.services.agent_service import agent_service
@@ -82,11 +80,6 @@ from app.tools.memory_tools import memory_storage, detect_sensitive_data
 from app.tools.briefing_tools import build_daily_briefing
 from app.tools.gmail_tools import list_gmail_messages, summarize_gmail_messages
 from app.tools.calendar_tools import list_calendar_events, summarize_calendar_events
-from app.tools.browser_automation_tools import (
-    browser_navigate,
-    browser_read_page,
-    browser_fill_field,
-)
 
 def extract_token_from_request(request: Request) -> Optional[str]:
     """Extract session token from Authorization: Bearer <token> or X-Session-Token header."""
@@ -174,7 +167,12 @@ router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check() -> HealthResponse:
-    """System health-check verifying server readiness, storage paths, and active tools."""
+    """System health-check verifying server readiness and active tools.
+
+    The response intentionally contains no filesystem paths: /health is
+    public, so absolute workspace/notes/screenshots directories are not
+    disclosed to unauthenticated callers.
+    """
     tools = [t.name for t in tool_registry.get_all_tools()]
     rem_count = len(reminders_storage.list_all(include_completed=True))
     mem_count = len(memory_storage.list_all())
@@ -186,9 +184,6 @@ async def health_check() -> HealthResponse:
         search_configured=search_ready,
         search_provider=settings.SEARCH_PROVIDER,
         platform=sys.platform,
-        workspace_directory=str(settings.WORKSPACE_DIR),
-        notes_directory=str(settings.NOTES_DIR),
-        screenshots_directory=str(settings.SCREENSHOTS_DIR),
         reminders_count=rem_count,
         memories_count=mem_count,
         memory_enabled=settings.MEMORY_ENABLED,
