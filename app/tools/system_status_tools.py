@@ -1,6 +1,4 @@
 import re
-import sys
-from typing import Any, Dict, Optional
 
 import psutil
 
