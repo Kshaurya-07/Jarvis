@@ -38,9 +38,6 @@ class HealthResponse(BaseModel):
     search_configured: bool = False
     search_provider: str = "tavily"
     platform: str
-    workspace_directory: str
-    notes_directory: str
-    screenshots_directory: str
     reminders_count: int = 0
     memories_count: int = 0
     memory_enabled: bool = True
