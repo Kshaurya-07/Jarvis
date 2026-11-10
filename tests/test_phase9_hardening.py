@@ -1,13 +1,11 @@
 import json
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 import pytest
-from starlette.testclient import TestClient
 
 from app.core.config import Settings, ConfigurationError, settings
 from app.core.logger import action_logger, scrub_sensitive_text
-from app.core.rate_limiter import auth_rate_limiter, AuthFailureRateLimiter
+from app.core.rate_limiter import auth_rate_limiter
 from app.core.security import resolve_safe_path, SecurityViolationError
 from app.core.data_manager import user_data_manager
 from app.tools.notes_tools import create_note
