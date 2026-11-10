@@ -1,6 +1,5 @@
 import subprocess
-import sys
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from app.core.confirmation import confirmation_manager
 from app.core.security import verify_windows_os, UnsupportedPlatformError
