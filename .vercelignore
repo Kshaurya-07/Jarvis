@@ -45,15 +45,15 @@ __pycache__/
 
 # 4. Backend Application Code & Local Server Configurations
 # The backend is built strictly for local loopback execution (127.0.0.1:8000).
-app/
-requirements.txt
+backend/app/
+backend/requirements.txt
 pytest.ini
 .pytest_cache/
 .coverage
 htmlcov/
 
 # 5. Automated Tests
-tests/
+backend/tests/
 
 # 6. Local User Data, Private Stores & Audit Logs
 data/
@@ -69,7 +69,7 @@ logs/
 
 # 7. Local Chrome Browser Extension
 # The extension runs unpacked locally in Google Chrome (chrome://extensions).
-extension/
+frontend/extension/
 
 # 8. Git, OS & IDE Artifacts
 .git/

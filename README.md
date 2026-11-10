@@ -11,7 +11,7 @@ actions that are permitted, and reports the result back to you.
 That cross-device vision is the destination, not the starting point. Today,
 phone-to-laptop commands work when your phone is paired with your laptop over
 your private Tailscale network; the other directions are labelled honestly in
-the status table below and on the [vision landing page](landing/index.html).
+the status table below and on the [vision landing page](frontend/landing/index.html).
 
 Under the hood, a FastAPI backend on your own laptop talks to Google Gemini,
 which can call 26 tools: read and search your files and notes, control
@@ -34,7 +34,7 @@ cloud relay.
 | Choosing between several paired devices | In development | One laptop can be paired at a time today. |
 | Laptop → phone actions (e.g. reminders on your phone) | Planned | Needs a phone companion that can receive actions. |
 | Tablet as a command source | Planned | The companion web app opens in a tablet browser; a dedicated flow is planned. |
-| Wi-Fi, volume & brightness controls | Planned | Interfaces exist in `app/tools/future_interfaces.py`; the features are not implemented. |
+| Wi-Fi, volume & brightness controls | Planned | Interfaces exist in `backend/app/tools/future_interfaces.py`; the features are not implemented. |
 | Windows-only tools (app launch, screenshots, system status) | Available — Windows | On macOS/Linux these report “unsupported”. |
 
 Jarvis never submits forms, quizzes, exams, or purchases, and it never asks you
@@ -116,18 +116,20 @@ git clone https://github.com/Kshaurya-07/Jarvis.git
 cd Jarvis
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 copy .env.example .env
 ```
 
-Edit `.env` and set at least `GEMINI_API_KEY`, then start the server:
+Edit `.env` and set at least `GEMINI_API_KEY`, then start the server
+from the `backend/` folder:
 
 ```powershell
-.\.venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+cd backend
+.\..\.venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 On macOS/Linux use `python3 -m venv .venv`,
-`source .venv/bin/activate`, `cp .env.example .env`, and
+`source .venv/bin/activate`, `cp .env.example .env`, and from `backend/`:
 `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`.
 
 Open `http://127.0.0.1:8000/` (redirects to `/mobile/`) or
@@ -137,7 +139,7 @@ Open `http://127.0.0.1:8000/` (redirects to `/mobile/`) or
 ### Chrome extension
 
 1. Open `chrome://extensions/` and enable **Developer mode**.
-2. Click **Load unpacked** and select the `extension/` folder.
+2. Click **Load unpacked** and select the `frontend/extension/` folder.
 3. Pin **Jarvis Local Companion** to the toolbar and click **Read this page**
    on a tab you want summarised.
 
@@ -151,7 +153,7 @@ for fast startup; API calls always go to the live backend.
 ## Configuration
 
 Copy `.env.example` to `.env`. Never commit a real `.env` — it is
-gitignored. All settings have defaults in `app/core/config.py`.
+gitignored. All settings have defaults in `backend/app/core/config.py`.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
@@ -241,7 +243,7 @@ search is not configured when it is requested.
    ```powershell
    tailscale serve --https=443 http://127.0.0.1:8000
    ```
-3. Generate a one-time pairing code on the laptop:
+3. Generate a one-time pairing code on the laptop (from `backend/`):
    ```powershell
    python -m app.cli pair
    ```
@@ -333,7 +335,7 @@ authentication, and the demo flow. A Linux CI workflow is provided in
 | `GEMINI_API_KEY is not configured` | Missing or placeholder key in `.env` | Add a key from Google AI Studio. Jarvis runs offline until then. |
 | `403 Forbidden: Host not authorized` | Accessed via an unauthorised hostname | Use `http://127.0.0.1:8000` or `http://localhost:8000`. |
 | `403 Forbidden: Origin not authorized` | Request came from an unauthorised origin | Only localhost, `chrome-extension://*`, and the configured PWA origin are allowed. |
-| `401 Remote authentication required` | Remote request without a valid session token | Pair from the laptop (`python -m app.cli pair`) and reconnect from the phone. |
+| `401 Remote authentication required` | Remote request without a valid session token | Pair from the laptop (`cd backend` then `python -m app.cli pair`) and reconnect from the phone. |
 | `413 Request Entity Too Large` | Request body over the 2 MB cap | Reduce input or page-text size. |
 | `429 Too Many Requests` | Too many auth/confirmation failures | Wait 60 seconds, then retry. |
 | Google disconnected / token revoked | Token revoked in Google account settings | Reconnect via `GET /api/auth/google/url`. |
@@ -341,29 +343,43 @@ authentication, and the demo flow. A Linux CI workflow is provided in
 
 ## Project structure
 
+The repo is split into two top-level folders: `frontend/` holds everything
+a browser loads, and `backend/` holds the local FastAPI server and its
+tests. The repo root stays small — `README.md`, `.env.example`,
+`.gitignore`, and `vercel.json` only (plus the usual `.github/` workflows).
+
 ```
 Jarvis/
-├── app/
-│   ├── main.py                  # FastAPI app, origin/host validation, lifespan
-│   ├── cli.py                   # CLI helpers (e.g. `python -m app.cli pair`)
-│   ├── api/
-│   │   ├── routes.py            # All API endpoints
-│   │   └── schemas.py           # Pydantic request/response models
-│   ├── core/                    # config, security, confirmation, remote auth,
-│   │                            # Google OAuth, data manager, demo manager, logger
-│   ├── services/                # Gemini agent service, extension service
-│   └── tools/                   # 26 registered tools (workspace, notes, system,
-│                                # screenshots, reminders, memory, search, briefing,
-│                                # Gmail, Calendar, browser automation)
-├── demo/                        # Fictional local demo page (/demo/)
-├── extension/                   # Chrome extension, Manifest V3 (activeTab, scripting)
-├── mobile/                      # Mobile PWA companion (/mobile/)
-├── public/                      # Static build output for the hosted PWA
-├── scripts/prepare_static.py    # Builds public/ from mobile/ and demo/
-├── tests/                       # 181 pytest tests across 21 test files
+├── frontend/
+│   ├── landing/                 # Vision landing page (/landing/)
+│   │   ├── index.html           # 3D hero, scroll + pointer effects
+│   │   ├── landing.css
+│   │   └── landing.js
+│   ├── mobile/                  # Mobile PWA companion (/mobile/)
+│   ├── demo/                    # Fictional local demo page (/demo/)
+│   ├── extension/               # Chrome extension, Manifest V3 (activeTab, scripting)
+│   └── public/                  # Static build output for the hosted PWA
+│                                # (generated — run backend/scripts/prepare_static.py)
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, origin/host validation, lifespan
+│   │   ├── cli.py               # CLI helpers (e.g. `python -m app.cli pair`)
+│   │   ├── api/
+│   │   │   ├── routes.py        # All API endpoints
+│   │   │   └── schemas.py       # Pydantic request/response models
+│   │   ├── core/                # config, security, confirmation, remote auth,
+│   │   │                        # Google OAuth, data manager, demo manager, logger
+│   │   ├── services/            # Gemini agent service, extension service
+│   │   └── tools/               # 26 registered tools (workspace, notes, system,
+│   │                            # screenshots, reminders, memory, search, briefing,
+│   │                            # Gmail, Calendar, browser automation)
+│   ├── tests/                   # 181 pytest tests across 21 test files
+│   ├── scripts/
+│   │   └── prepare_static.py    # Builds frontend/public/ from frontend/mobile/,
+│   │                            # frontend/demo/ and frontend/landing/
+│   └── requirements.txt         # Python dependencies
 ├── .env.example                 # Environment variable template (no real secrets)
-├── requirements.txt             # Python dependencies
-└── vercel.json                  # Static hosting config for the PWA
+└── vercel.json                  # Static hosting config (outputDirectory: frontend/public)
 ```
 
 ## Known limitations
