@@ -116,41 +116,6 @@ h2 {
   line-height: 1;
 }
 
-/* Phase 10 Demo Banner */
-.demo-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: rgba(99, 102, 241, 0.12);
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
-}
-
-.demo-badge {
-  background-color: #6366f1;
-  color: #ffffff;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.demo-link {
-  color: #a5b4fc;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.demo-link:hover {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
 /* Mode selector */
 .mode-selector {
   display: flex;

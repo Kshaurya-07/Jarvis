@@ -21,8 +21,8 @@ DEMO_STEPS = [
     },
     {
         "step": 3,
-        "title": "Open Local Fictional Demo Page",
-        "description": "Navigate to http://127.0.0.1:8000/demo/ in Chrome. Contains fictional Europa space mission content.",
+        "title": "Open a Web Page in Chrome",
+        "description": "Open any web page in Chrome. The extension can read its visible text for grounded summaries.",
     },
     {
         "step": 4,

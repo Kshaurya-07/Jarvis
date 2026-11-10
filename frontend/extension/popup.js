@@ -615,20 +615,6 @@ document.addEventListener("DOMContentLoaded", () => {
   voiceDoneBtn.addEventListener("click", handleVoiceDone);
   voiceCancelBtn.addEventListener("click", handleVoiceCancel);
   stopSpeakingBtn.addEventListener("click", stopSpeaking);
-
-  // Phase 10: Open Demo Page Quick Action
-  const openDemoTabBtn = document.getElementById("open-demo-tab-btn");
-  if (openDemoTabBtn) {
-    openDemoTabBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const demoUrl = "http://127.0.0.1:8000/demo/";
-      if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.create) {
-        chrome.tabs.create({ url: demoUrl });
-      } else {
-        window.open(demoUrl, "_blank");
-      }
-    });
-  }
 });
 
 
