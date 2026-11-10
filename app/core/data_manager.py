@@ -2,12 +2,12 @@ import datetime
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from app import __version__
 from app.core.config import settings
 from app.core.logger import app_logger
-from app.core.security import sanitize_filename, resolve_safe_path, SecurityViolationError
+from app.core.security import sanitize_filename, resolve_safe_path
 from app.tools.memory_tools import memory_storage, MemoryItem
 from app.tools.reminders_tools import reminders_storage, Reminder
 
