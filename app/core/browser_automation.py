@@ -1,25 +1,20 @@
 import re
 from urllib.parse import urlparse
-from typing import Any, Dict, List, Optional, Set, Tuple
-from pydantic import BaseModel, Field
+from typing import List, Optional, Set
 
-from app.core.config import settings
 from app.core.logger import app_logger
 
 
 class BrowserSecurityViolation(Exception):
     """Raised when a browser action attempts to violate safety boundaries."""
-    pass
 
 
 class SensitiveFieldViolation(BrowserSecurityViolation):
     """Raised when an action attempts to read or fill sensitive fields (passwords, payment, auth)."""
-    pass
 
 
 class DomainSecurityViolation(BrowserSecurityViolation):
     """Raised when an action targets a domain outside the user-approved domain."""
-    pass
 
 
 # Default safe domains that can be approved
