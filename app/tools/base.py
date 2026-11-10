@@ -1,5 +1,5 @@
 from typing import Any, Callable, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ToolResult(BaseModel):
