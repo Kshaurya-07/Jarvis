@@ -1,9 +1,8 @@
 import time
 from urllib.parse import urlparse
-from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel
 
-from google import genai
 from google.genai import types
 
 from app.core.config import settings
