@@ -1,9 +1,8 @@
 import os
-import re
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from urllib.parse import urlparse
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.tools.base import ToolResult
