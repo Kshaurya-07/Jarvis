@@ -7,13 +7,11 @@ Jarvis will never claim or pretend these features are active until implemented.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from typing import Any, Dict, List
 
 
 class FutureFeatureNotImplementedError(NotImplementedError):
     """Raised when a future, unactivated feature interface is called."""
-    pass
 
 
 class WiFiControlInterface(ABC):
