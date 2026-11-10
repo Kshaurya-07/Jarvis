@@ -48,6 +48,8 @@ class ExtensionService:
         page_text: str,
         question: Optional[str] = None,
         mode: str = "summary",
+        user=None,
+        gemini_api_key: Optional[str] = None,
     ) -> PageAnalysisResult:
         """
         Analyze extracted active tab text with Gemini.
@@ -85,9 +87,14 @@ class ExtensionService:
         except Exception:
             domain = "unknown"
 
-        # Check Gemini client configuration
+        # Check this user's own Gemini key (BYOK — no server key fallback).
+        from app.core.byok import load_user_key
+        from app.core.user_context import get_current_user, resolve_user
+
+        _u = resolve_user(user or get_current_user())
+        api_key = gemini_api_key or load_user_key(_u)
         try:
-            client = agent_service._get_client()
+            client = agent_service._get_client(api_key)
         except ValueError as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             action_logger.record_action(
@@ -95,11 +102,12 @@ class ExtensionService:
                 status="failure",
                 details=f"mode={mode} | domain={domain} | error=api_key_missing",
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return PageAnalysisResult(
                 reply=(
-                    "Jarvis backend is running, but the Gemini API key is not configured. "
-                    "Please set your GEMINI_API_KEY in the .env file to enable AI page analysis."
+                    "Add your own free Gemini key in Settings before using page analysis — "
+                    "get one from Google AI Studio. Jarvis has no shared server key."
                 ),
                 mode=mode,
                 disclosure=disclosure_text,
@@ -155,6 +163,7 @@ Webpage URL: {url}
                 status="success",
                 details=f"mode={mode} | domain={domain} | chars={len(page_text)}",
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
 
             final_reply = response.text or "Unable to generate a response from the extracted page text."
@@ -175,6 +184,7 @@ Webpage URL: {url}
                 status="failure",
                 details=f"mode={mode} | domain={domain} | error={str(e)[:100]}",
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return PageAnalysisResult(
                 reply=f"Encountered an error while analyzing page text: {str(e)}",

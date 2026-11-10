@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="cursor-glow" aria-hidden="true"></div>
+  <div id="cursor-ring" aria-hidden="true"></div>
   <div class="app-container">
     <!-- Top Bar -->
     <header class="app-header">
@@ -42,12 +44,14 @@
       </div>
     </header>
 
+    <div class="scroll-progress" aria-hidden="true"><span id="scroll-progress-fill" class="scroll-progress-fill"></span></div>
+
     <!-- Network Architecture Notice Banner (Option B) -->
     <div id="network-notice" class="network-notice" style="display: none;">
       <div class="notice-content">
         <svg class="notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <span id="network-notice-text">Jarvis runs on your laptop in Localhost-Only mode (Option B). Phone-to-laptop remote commands across different devices require private Tailscale pairing — one companion, every device, nothing in between.</span>
-        <button id="notice-pair-btn" class="notice-action-btn">Pair with Laptop</button>
+        <span id="network-notice-text">You're not signed in yet. Sign in with Google to chat from anywhere — your notes, reminders and history follow your account.</span>
+        <button id="notice-pair-btn" class="notice-action-btn">Sign in with Google</button>
       </div>
       <button id="close-notice-btn" class="notice-close" aria-label="Dismiss">&times;</button>
     </div>
@@ -71,6 +75,19 @@
 
     <!-- Main Chat & Assistant Response Area -->
     <main id="chat-stream" class="chat-stream" role="log" aria-live="polite">
+      <div id="chat-wordmark" class="chat-wordmark" aria-hidden="true">JARVIS</div>
+      <!-- Onboarding: three steps, no jargon. Hidden once signed in + key saved. -->
+      <section id="onboarding-banner" class="onboarding" style="display: none;">
+        <p class="eyebrow"><span class="eyebrow-num">01</span> &nbsp;Get set up in a minute</p>
+        <h2>Your companion, everywhere you are</h2>
+        <p>No laptop, no install, no setup on your side. Three quick steps:</p>
+        <ol>
+          <li id="onboard-step-1"><span class="step-num">1</span><span>Sign in with Google</span></li>
+          <li id="onboard-step-2"><span class="step-num">2</span><span>Add your free Gemini key (Settings below)</span></li>
+          <li id="onboard-step-3"><span class="step-num">3</span><span>Start chatting — same notes, reminders &amp; history on every device</span></li>
+        </ol>
+        <button id="onboard-signin-btn" class="btn-primary" style="width:100%; padding:0.6rem; border:none; border-radius:999px; cursor:pointer;">Sign in with Google</button>
+      </section>
       <!-- Welcome Message -->
       <div class="message assistant-message welcome-card">
         <div class="message-header">
@@ -78,10 +95,9 @@
           <span class="timestamp">Ready</span>
         </div>
         <div class="message-body">
-          <p>Hello! I am Jarvis, your personal AI companion. Give me a command here, and choose where it should happen — on your laptop, from this phone.</p>
+          <p>Hello! I am Jarvis, your personal AI companion — here on your phone, your laptop, and your tablet, all in sync.</p>
           <ul class="quick-tips">
-            <li>Ask questions or summarize a file on your laptop</li>
-            <li>Query system status or notes</li>
+            <li>Ask questions or search your notes</li>
             <li>Manage reminders and memories</li>
             <li>Search the web or get a daily briefing</li>
           </ul>
@@ -155,14 +171,54 @@
     </div>
     <div class="drawer-content">
       <section class="settings-section highlight-section">
-        <h3>Private Tailscale Connection</h3>
+        <h3>Your account</h3>
+        <p class="settings-subtext">Jarvis lives in the cloud. Sign in once — your chats, notes, reminders and memories follow you to every device.</p>
+        <div id="account-signed-out">
+          <button id="signin-btn" class="btn-primary" style="width:100%; padding:0.6rem; border:none; border-radius:999px; cursor:pointer;">Sign in with Google</button>
+        </div>
+        <div id="account-signed-in" style="display: none;">
+          <p class="account-email">Signed in as <strong id="account-email">—</strong></p>
+          <button id="logout-btn" class="btn-secondary" style="width:100%; padding:0.5rem; cursor:pointer;">Sign out</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Your Gemini key</h3>
+        <p class="settings-subtext">Jarvis uses <strong>your own</strong> free Gemini key — there is no shared key and no bill for anyone else. Your key is encrypted on the server and never shown again after saving.</p>
+        <p id="key-status" class="key-status">Checking…</p>
+        <ol style="margin: 0 0 10px 18px; font-size: 0.85rem; color: var(--muted);">
+          <li>Open <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a> and tap <strong>Get API key</strong>.</li>
+          <li>Copy the key (it starts with <code>AIza</code>).</li>
+          <li>Paste it below and tap <strong>Save key</strong>.</li>
+        </ol>
+        <div class="form-group">
+          <label for="gemini-key-input" style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.25rem;">Gemini API key</label>
+          <input type="password" id="gemini-key-input" class="settings-input" placeholder="AIza…" autocomplete="off" spellcheck="false" style="width:100%; padding:0.5rem; background:#121215; border:1px solid var(--line); border-radius:6px; color:#f5f1e8; font-size:0.85rem;">
+        </div>
+        <button id="save-key-btn" class="btn-primary" style="width:100%; margin-top:0.75rem; padding:0.6rem; border:none; border-radius:999px; cursor:pointer;">Save key</button>
+        <button id="delete-key-btn" class="btn-secondary" style="width:100%; margin-top:0.5rem; padding:0.5rem; cursor:pointer;">Remove saved key</button>
+        <p id="key-message" class="key-status"></p>
+      </section>
+
+      <section class="settings-section">
+        <h3>Cloud backend address</h3>
+        <p class="settings-subtext">Usually leave this blank — the app talks to the backend on the same address it was opened from. Only set it if your backend lives somewhere else.</p>
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="api-base-url-input" style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.25rem;">Backend URL (optional)</label>
+          <input type="url" id="api-base-url-input" class="settings-input" placeholder="https://your-backend.example.com" autocomplete="off" spellcheck="false" style="width:100%; padding:0.5rem; background:#121215; border:1px solid var(--line); border-radius:6px; color:#f5f1e8; font-size:0.85rem;">
+        </div>
+      </section>
+
+      <section class="settings-section highlight-section">
+        <h3>Legacy: laptop pairing (Tailscale)</h3>
+        <p class="settings-subtext">Only for the old local mode — a laptop backend reached over a private Tailscale network. The cloud app above needs no laptop at all.</p>
         <p class="settings-subtext">
           Connect securely to your Windows laptop over private Tailscale. No cloud relays or open ports.
         </p>
 
         <div class="form-group" style="margin-top: 0.75rem;">
           <label for="remote-gateway-url" style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.25rem;">Laptop Tailscale Address</label>
-          <input type="url" id="remote-gateway-url" class="settings-input" placeholder="https://my-laptop.tailnet-xyz.ts.net" autocomplete="off" spellcheck="false" style="width:100%; padding:0.5rem; background:#0f172a; border:1px solid var(--border); border-radius:6px; color:#fff; font-size:0.85rem;">
+          <input type="url" id="remote-gateway-url" class="settings-input" placeholder="https://my-laptop.tailnet-xyz.ts.net" autocomplete="off" spellcheck="false" style="width:100%; padding:0.5rem; background:#121215; border:1px solid var(--line); border-radius:6px; color:#f5f1e8; font-size:0.85rem;">
           <small style="display:block; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">Provided by running <code>tailscale serve</code> on your laptop.</small>
         </div>
 
@@ -303,7 +359,7 @@
             <span>Push-to-Talk Voice Input</span>
           </div>
           <div class="demo-step-desc">
-            Tap the microphone button, speak your request, inspect and edit the local transcript in the input box, then send.
+            Tap the microphone button, speak your request, inspect and edit the transcript in the input box, then send.
           </div>
         </div>
 
@@ -333,6 +389,7 @@
   <!-- Backdrop overlay for drawers -->
   <div id="drawer-backdrop" class="drawer-backdrop" style="display: none;"></div>
 
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

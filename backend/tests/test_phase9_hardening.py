@@ -187,10 +187,14 @@ def test_startup_configuration_validation():
     with pytest.raises(ConfigurationError):
         bad_search_settings.validate_configuration()
 
-    # 5. Missing GEMINI_API_KEY generates informational notice
+    # 5. BYOK (Phase 12): a server GEMINI_API_KEY is ignored, and the
+    # validator says so when one is set; a missing key is no longer a notice
+    # (each user brings their own key).
+    key_set_settings = Settings(GEMINI_API_KEY="AIzaSyDummyServerKey1234567890")
+    notices = key_set_settings.validate_configuration()
+    assert any("GEMINI_API_KEY" in n and "IGNORED" in n for n in notices)
     default_settings = Settings(GEMINI_API_KEY="")
-    notices = default_settings.validate_configuration()
-    assert any("GEMINI_API_KEY" in n for n in notices)
+    assert not any("GEMINI_API_KEY" in n for n in default_settings.validate_configuration())
 
 
 # --- 5. User Data Controls & Data Management Tests ---

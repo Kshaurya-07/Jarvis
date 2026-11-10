@@ -449,9 +449,9 @@
           from the same machine. The numbers below are the only ones we can verify.</p>
         <div class="stats-grid dev-stats">
           <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="26">26</span></p><p class="stat-label">Registered tools, listed at GET /api/tools</p></div>
-          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="181">181</span></p><p class="stat-label">Tests in the suite — 159 passed, 22 skipped</p></div>
-          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="43">43</span></p><p class="stat-label">API routes in the backend, 39 of them behind a remote session</p></div>
-          <div class="stat reveal"><p class="stat-num">Local</p><p class="stat-label">Backend binds to localhost by default — no cloud relay, no uptime claim to make</p></div>
+          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="201">201</span></p><p class="stat-label">Tests in the suite — 179 passed, 22 skipped</p></div>
+          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="52">52</span></p><p class="stat-label">API routes in the backend, all AI and data routes behind Google sign-in</p></div>
+          <div class="stat reveal"><p class="stat-num">Cloud</p><p class="stat-label">Backend on Vercel serverless, data in Postgres — open it anywhere, nothing on your laptop</p></div>
         </div>
 
         <div class="dev-grid">
@@ -514,9 +514,9 @@
           </article>
         </div>
         <div class="privacy-grid">
-          <article class="card reveal"><h3>Local by design</h3><p>The Jarvis backend runs on your own laptop and binds to localhost by default. There is no cloud relay, no telemetry, and no background sync. Your phone reaches it only over your private Tailscale network, after pairing.</p></article>
+          <article class="card reveal"><h3>Cloud by design</h3><p>Jarvis lives in the cloud: sign in with Google, add your own free Gemini key, and everything — chats, notes, reminders, memories — syncs across your devices. There is no telemetry and no background sync. The old laptop-only mode (localhost + Tailscale pairing) still exists for local development.</p></article>
           <article class="card reveal"><h3>Permissions first</h3><p>Apps can only be launched from an allowlist, files only inside approved folders, and browser actions only on domains you approve. Sensitive fields — passwords, cards, tokens — are never read or filled.</p></article>
-          <article class="card reveal"><h3>What leaves your laptop</h3><p>Chat text and the content you ask to summarise are sent to Gemini; search queries go to your chosen search provider; Gmail and Calendar data goes to Gemini only when you ask for a summary, and only after you sign in with Google. Passwords and API keys are never stored in memory or logs.</p></article>
+          <article class="card reveal"><h3>What leaves your account</h3><p>Chat text and the content you ask to summarise are sent to Gemini using <em>your own</em> Gemini key; search queries go to your chosen search provider; Gmail and Calendar data goes to Gemini only when you ask for a summary, and only after you sign in with Google. Passwords are never stored; your Gemini key is stored encrypted and never shown again.</p></article>
         </div>
       </div>
     </section>
@@ -535,7 +535,7 @@
             <p>Clone the repo, start the FastAPI backend, and open the companion in your
               browser. Chat, tools, reminders and notes all work on the laptop itself.</p>
             <ul class="access-list">
-              <li>Backend on localhost, no account</li>
+              <li>Cloud backend, Google sign-in, your own Gemini key</li>
               <li>26 tools, voice input, daily briefing</li>
               <li>Read-only Gmail &amp; Calendar after Google sign-in</li>
             </ul>

@@ -55,6 +55,7 @@ def prepare_static():
         "index.html",
         "style.css",
         "app.js",
+        "config.js",
         "manifest.webmanifest",
         "service-worker.js",
     ]

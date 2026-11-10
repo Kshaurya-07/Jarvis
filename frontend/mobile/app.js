@@ -66,6 +66,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // Phase 11: In-Memory Session Token ONLY (Never stored in localStorage, cookies, or logs!)
   let remoteSessionToken = null;
   const GATEWAY_URL_KEY = "jarvis_tailscale_gateway_url";
+  const API_BASE_URL_KEY = "jarvis_api_base_url";
+
+  // Cloud-first: the backend is usually same-origin (Vercel hosts the app
+  // and the backend together), so the default base URL is "".
+  // window.JARVIS_CONFIG.apiBaseUrl (config.js) or the Settings field below
+  // overrides it only when the backend lives somewhere else.
+  function configuredApiBaseUrl() {
+    const fromConfig = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.apiBaseUrl || "").trim();
+    if (fromConfig) return fromConfig.replace(/\/+$/, "");
+    const fromSettings = (localStorage.getItem(API_BASE_URL_KEY) || "").trim();
+    return fromSettings ? fromSettings.replace(/\/+$/, "") : "";
+  }
 
   // Initialize PWA Service Worker
   if ("serviceWorker" in navigator) {
@@ -82,6 +94,8 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 
   function getBaseUrl() {
+    const configured = configuredApiBaseUrl();
+    if (configured) return configured;
     if (isLocalhostHost) {
       return "";
     }
@@ -134,15 +148,144 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Initial health check and periodic ping
-  checkHealth();
-  setInterval(checkHealth, 15000);
+  // --- Cloud account: Google sign-in + your own Gemini key (BYOK) ---
+  const signinBtn = document.getElementById("signin-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const accountSignedOut = document.getElementById("account-signed-out");
+  const accountSignedIn = document.getElementById("account-signed-in");
+  const accountEmailEl = document.getElementById("account-email");
+  const onboardBanner = document.getElementById("onboarding-banner");
+  const onboardSigninBtn = document.getElementById("onboard-signin-btn");
+  const keyStatusEl = document.getElementById("key-status");
+  const keyInput = document.getElementById("gemini-key-input");
+  const saveKeyBtn = document.getElementById("save-key-btn");
+  const deleteKeyBtn = document.getElementById("delete-key-btn");
+  const keyMessageEl = document.getElementById("key-message");
+  const apiBaseUrlInput = document.getElementById("api-base-url-input");
+  let meState = { authenticated: false, has_key: false };
+  let historyLoaded = false;
 
-  if (noticePairBtn) {
-    noticePairBtn.addEventListener("click", () => {
-      openDrawer(settingsDrawer);
+  function goSignIn() {
+    window.location.href = (getBaseUrl() || "") + "/api/auth/login";
+  }
+  if (signinBtn) signinBtn.addEventListener("click", goSignIn);
+  if (onboardSigninBtn) onboardSigninBtn.addEventListener("click", goSignIn);
+  if (noticePairBtn) noticePairBtn.addEventListener("click", goSignIn);
+
+  async function refreshMe() {
+    try {
+      const resp = await apiFetch("/api/auth/me", { cache: "no-store" });
+      if (!resp.ok) return;
+      meState = await resp.json();
+      if (accountSignedOut) accountSignedOut.style.display = meState.authenticated ? "none" : "block";
+      if (accountSignedIn) accountSignedIn.style.display = meState.authenticated ? "block" : "none";
+      if (accountEmailEl && meState.email) accountEmailEl.textContent = meState.email;
+      if (keyStatusEl) {
+        keyStatusEl.innerHTML = meState.has_key
+          ? "Saved — key ending <strong>" + escapeHtml(meState.key_hint || "") + "</strong>. It is encrypted and never shown again."
+          : "No key saved yet — add yours below to start chatting.";
+      }
+      const step1 = document.getElementById("onboard-step-1");
+      const step2 = document.getElementById("onboard-step-2");
+      if (step1) step1.classList.toggle("done", !!meState.authenticated);
+      if (step2) step2.classList.toggle("done", !!meState.has_key);
+      if (onboardBanner) {
+        onboardBanner.style.display = (meState.authenticated && meState.has_key) ? "none" : "block";
+      }
+      if (!meState.authenticated && networkNotice) networkNotice.style.display = "flex";
+      if (meState.authenticated && !historyLoaded) {
+        historyLoaded = true;
+        loadChatHistory();
+      }
+    } catch (e) {
+      /* Offline — the health check already shows the state. */
+    }
+  }
+
+  async function loadChatHistory() {
+    try {
+      const resp = await apiFetch("/api/chat/history?limit=30", { cache: "no-store" });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const messages = Array.isArray(data.messages) ? data.messages : [];
+      // Only render history into an empty stream (the welcome card counts as empty).
+      const existing = chatStream.querySelectorAll(".message:not(.welcome-card)").length;
+      if (existing > 0 || messages.length === 0) return;
+      const welcome = chatStream.querySelector(".welcome-card");
+      if (welcome) welcome.remove();
+      messages.forEach((m) => appendMessage(m.role === "user" ? "user" : "assistant", m.content || ""));
+    } catch (e) {
+      console.debug("Chat history load failed:", e);
+    }
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch (_) {}
+      historyLoaded = false;
+      refreshMe();
+      checkHealth();
     });
   }
+
+  if (saveKeyBtn) {
+    saveKeyBtn.addEventListener("click", async () => {
+      const key = (keyInput?.value || "").trim();
+      if (!key) { if (keyMessageEl) keyMessageEl.textContent = "Paste your Gemini key first."; return; }
+      saveKeyBtn.disabled = true;
+      try {
+        const resp = await apiFetch("/api/auth/key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: key }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.detail || ("HTTP " + resp.status));
+        if (keyInput) keyInput.value = "";
+        if (keyMessageEl) keyMessageEl.textContent = "Key saved — you're ready to chat.";
+        refreshMe();
+      } catch (err) {
+        if (keyMessageEl) keyMessageEl.textContent = "Couldn't save that key: " + err.message;
+      } finally {
+        saveKeyBtn.disabled = false;
+      }
+    });
+  }
+
+  if (deleteKeyBtn) {
+    deleteKeyBtn.addEventListener("click", async () => {
+      try { await apiFetch("/api/auth/key", { method: "DELETE" }); } catch (_) {}
+      if (keyMessageEl) keyMessageEl.textContent = "Key removed. Add a new one to keep chatting.";
+      refreshMe();
+    });
+  }
+
+  if (apiBaseUrlInput) {
+    apiBaseUrlInput.value = localStorage.getItem(API_BASE_URL_KEY) || "";
+    apiBaseUrlInput.addEventListener("change", () => {
+      localStorage.setItem(API_BASE_URL_KEY, apiBaseUrlInput.value.trim());
+      checkHealth();
+      refreshMe();
+    });
+  }
+
+  // Login redirect landing: ?login=success / ?login=error on /mobile/.
+  (function handleLoginReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("login");
+    if (!result) return;
+    if (result === "success") {
+      appendMessage("assistant", "Signed in — welcome back. Your chats, notes and reminders are in sync on this device.");
+    } else {
+      appendMessage("assistant", "Sign-in didn't complete. Please try signing in with Google again from Settings.");
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  })();
+
+  // Initial health check and periodic ping
+  checkHealth();
+  refreshMe();
+  setInterval(checkHealth, 15000);
 
   // Load saved gateway URL on initialization (non-sensitive host config)
   if (remoteGatewayUrlInput) {
@@ -341,6 +484,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          throw new Error("Please sign in with Google first — tap Settings, then Sign in with Google.");
+        }
+        if (response.status === 429) {
+          throw new Error(errData.detail || "Too many requests — please wait a little and try again.");
+        }
         throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
       }
 
@@ -579,6 +728,83 @@ document.addEventListener("DOMContentLoaded", () => {
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   }
+
+  // --- Motion engine: pointer glow + ring, magnetic buttons, 3D tilt,
+  // per-pixel scroll (progress bar + wordmark). Same patterns as
+  // frontend/landing/landing.js. Fine pointers only; native cursor stays
+  // visible; touch and reduced-motion users get none of it.
+  (function initMotion() {
+    const motionOK = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finePointer = window.matchMedia("(pointer: fine)").matches;
+    if (!motionOK || !finePointer) return;
+    document.body.classList.add("has-fine-pointer");
+    const glowEl = document.getElementById("cursor-glow");
+    const ringEl = document.getElementById("cursor-ring");
+    const wordmarkEl = document.getElementById("chat-wordmark");
+    const progressFill = document.getElementById("scroll-progress-fill");
+    let gxT = -200, gyT = -200, gx = -200, gy = -200;
+    let rxT = -200, ryT = -200, rx = -200, ry = -200;
+    let ticking = false;
+    function applyFrame() {
+      gx += (gxT - gx) * 0.2; gy += (gyT - gy) * 0.2;
+      rx += (rxT - rx) * 0.35; ry += (ryT - ry) * 0.35;
+      if (glowEl) glowEl.style.transform = "translate3d(" + gx.toFixed(1) + "px," + gy.toFixed(1) + "px,0)";
+      if (ringEl) ringEl.style.transform = "translate3d(" + rx.toFixed(1) + "px," + ry.toFixed(1) + "px,0)";
+      ticking = false;
+      if (Math.abs(gxT - gx) > 0.5 || Math.abs(gyT - gy) > 0.5 || Math.abs(rxT - rx) > 0.5 || Math.abs(ryT - ry) > 0.5) {
+        requestTick();
+      }
+    }
+    function requestTick() {
+      if (!ticking) { ticking = true; requestAnimationFrame(applyFrame); }
+    }
+    document.addEventListener("pointermove", function (ev) {
+      gxT = ev.clientX; gyT = ev.clientY; rxT = ev.clientX; ryT = ev.clientY;
+      requestTick();
+    }, { passive: true });
+    document.addEventListener("pointerover", function (ev) {
+      if (!ringEl) return;
+      const t = ev.target && ev.target.closest ? ev.target.closest("a, button, input, textarea, .chip") : null;
+      ringEl.classList.toggle("is-hover", !!t);
+    });
+    // Magnetic send / voice buttons drift a few px toward the pointer.
+    [sendBtn, voiceBtn].forEach(function (btn) {
+      if (!btn) return;
+      btn.addEventListener("pointermove", function (ev) {
+        const r = btn.getBoundingClientRect();
+        const dx = (ev.clientX - (r.left + r.width / 2)) / r.width;
+        const dy = (ev.clientY - (r.top + r.height / 2)) / r.height;
+        btn.style.transform = "translate(" + (dx * 6).toFixed(1) + "px, " + (dy * 6).toFixed(1) + "px)";
+      });
+      btn.addEventListener("pointerleave", function () { btn.style.transform = ""; });
+    });
+    // 3D tilt on message cards (delegated — messages are added dynamically).
+    chatStream.addEventListener("pointermove", function (ev) {
+      const card = ev.target && ev.target.closest ? ev.target.closest(".message") : null;
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const trx = -((ev.clientY - r.top) / r.height - 0.5) * 6;
+      const try_ = ((ev.clientX - r.left) / r.width - 0.5) * 6;
+      card.style.setProperty("--rx", trx.toFixed(2) + "deg");
+      card.style.setProperty("--ry", try_.toFixed(2) + "deg");
+      card.classList.add("is-tilting");
+    });
+    chatStream.addEventListener("pointerleave", function (ev) {
+      const card = ev.target && ev.target.closest ? ev.target.closest(".message") : null;
+      if (!card) return;
+      card.classList.remove("is-tilting");
+    }, true);
+    // Per-pixel scroll: progress bar + wordmark drift/fade as you scroll.
+    chatStream.addEventListener("scroll", function () {
+      const max = chatStream.scrollHeight - chatStream.clientHeight;
+      const p = max > 0 ? chatStream.scrollTop / max : 0;
+      if (progressFill) progressFill.style.width = (p * 100).toFixed(1) + "%";
+      if (wordmarkEl) {
+        wordmarkEl.style.transform = "translateY(" + (chatStream.scrollTop * -0.08).toFixed(1) + "px)";
+        wordmarkEl.style.opacity = Math.max(0.25, 1 - p * 0.6).toFixed(2);
+      }
+    }, { passive: true });
+  })();
 
   // --- Drawers Management (Actions & Settings) ---
   function openDrawer(drawer) {

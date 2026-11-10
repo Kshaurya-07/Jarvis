@@ -1,23 +1,37 @@
+/* Design tokens — shared with the landing page (frontend/landing/landing.css):
+   near-black background, warm off-white text, muted grey, one violet-lilac accent. */
 :root {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent: #38bdf8;
-  --accent-hover: #0284c7;
-  --success: #10b981;
-  --warning: #f59e0b;
+  --bg: #0a0a0c;
+  --bg-primary: #0a0a0c;
+  --bg-secondary: #121215;
+  --bg-tertiary: #17171b;
+  --surface: #121215;
+  --surface-2: #17171b;
+  --text-primary: #f5f1e8;
+  --text-secondary: #a09d94;
+  --text-muted: #6f6d66;
+  --text: #f5f1e8;
+  --muted: #a09d94;
+  --faint: #6f6d66;
+  --accent: #b7a6f5;
+  --accent-hover: #ffffff;
+  --accent-soft: rgba(183, 166, 245, 0.14);
+  --cream: #f5f1e8;
+  --success: #7ddba3;
+  --warning: #e8c87a;
   --danger: #ef4444;
   --danger-hover: #dc2626;
-  --border-color: rgba(148, 163, 184, 0.15);
+  --border-color: rgba(245, 241, 232, 0.12);
+  --line: rgba(245, 241, 232, 0.12);
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-pill: 9999px;
+  --radius: 16px;
+  --radius-pill: 999px;
   --touch-target: 48px;
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --transition: 0.2s ease;
 }
 
@@ -77,7 +91,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--accent) 30%, #0369a1 100%);
+  background: radial-gradient(circle at 35% 35%, #efe7ff 0%, var(--accent) 45%, #5d4fb8 100%);
   box-shadow: 0 0 10px var(--accent);
 }
 
@@ -875,3 +889,170 @@ body {
   background: rgba(239, 68, 68, 0.2);
 }
 
+
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ==========================================================================
+   Landing-shared motion & depth (same patterns as frontend/landing/landing.js)
+   - Pointer glow + ring (fine pointers only; native cursor stays visible)
+   - Magnetic buttons, 3D tilt on message cards (perspective, --rx/--ry)
+   - Per-pixel scroll: chat progress bar + faint giant wordmark behind the
+     stream, both driven by chat-stream scroll position.
+   - Reduced motion: everything stills. Touch: pointer effects never appear.
+   ========================================================================== */
+
+/* Mono eyebrow labels, like the landing page. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eyebrow-num { color: var(--accent); }
+
+/* Landing-style pill buttons (shared with .btn-primary/.btn-secondary). */
+.btn-primary {
+  background: var(--cream) !important;
+  color: #0a0a0c !important;
+  border-radius: 999px !important;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #fff !important; }
+.btn-secondary {
+  background: transparent !important;
+  color: var(--text) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 999px !important;
+}
+.btn-secondary:hover { border-color: var(--muted) !important; }
+
+/* Chat stream is a 3D stage: messages are layered cards at different depths. */
+.chat-stream {
+  perspective: 1200px;
+  position: relative;
+  scroll-behavior: smooth;
+}
+.chat-wordmark {
+  position: sticky;
+  top: 8px;
+  z-index: 0;
+  font-size: clamp(4rem, 22vw, 9rem);
+  font-weight: 750;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  text-align: center;
+  color: rgba(245, 241, 232, 0.045);
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+}
+.message {
+  position: relative;
+  z-index: 1;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  animation: msg-in 0.35s ease backwards;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(10px) rotateX(4deg); }
+  to { opacity: 1; transform: translateY(0) rotateX(0deg); }
+}
+.message.is-tilting {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+.user-message {
+  background: var(--accent-soft) !important;
+  border: 1px solid rgba(183, 166, 245, 0.25) !important;
+  transform: translateZ(12px);
+}
+.assistant-message {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+/* User bubbles on the lilac-soft surface must read as warm off-white text. */
+.user-message .message-header { color: var(--muted) !important; }
+.user-message { color: var(--text) !important; }
+
+/* Scroll progress: thin lilac bar under the header, driven per-pixel. */
+.scroll-progress {
+  height: 2px;
+  background: transparent;
+  flex: none;
+}
+.scroll-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+/* Pointer glow + ring (JS adds .has-fine-pointer on desktop only). */
+#cursor-glow, #cursor-ring { display: none; }
+body.has-fine-pointer #cursor-glow {
+  display: block;
+  position: fixed;
+  left: 0; top: 0;
+  width: 340px; height: 340px;
+  margin: -170px 0 0 -170px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(183, 166, 245, 0.16), rgba(183, 166, 245, 0.04) 45%, transparent 70%);
+  filter: blur(6px);
+  pointer-events: none;
+  z-index: 1;
+}
+body.has-fine-pointer #cursor-ring {
+  display: block;
+  position: fixed;
+  left: 0; top: 0;
+  width: 34px; height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid rgba(183, 166, 245, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+body.has-fine-pointer #cursor-ring.is-hover {
+  transform: scale(1.5);
+  border-color: var(--accent);
+}
+
+/* Onboarding: the three first steps, in landing type. */
+.onboarding {
+  margin: 12px 16px 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  position: relative;
+  z-index: 1;
+}
+.onboarding h2 { font-size: 1.15rem; letter-spacing: -0.02em; margin: 8px 0 4px; }
+.onboarding p { color: var(--muted); font-size: 0.92rem; margin-bottom: 10px; }
+.onboarding ol { list-style: none; margin: 0 0 12px; display: grid; gap: 8px; }
+.onboarding li { display: flex; gap: 10px; align-items: baseline; font-size: 0.92rem; }
+.onboarding li .step-num {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 0.8rem;
+  flex: none;
+}
+.onboarding li.done { color: var(--muted); text-decoration: line-through; }
+.onboarding li.done .step-num { color: var(--success); }
+
+/* Account / key settings blocks. */
+.account-email { font-size: 0.95rem; margin: 4px 0 10px; }
+.key-status { font-size: 0.85rem; color: var(--muted); margin: 6px 0; }
+.key-status strong { color: var(--text); }
+.settings-input { font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) {
+  .message { animation: none; }
+  .chat-stream { scroll-behavior: auto; }
+  #cursor-glow, #cursor-ring { display: none !important; }
+  * { transition-duration: 0.01ms !important; }
+}

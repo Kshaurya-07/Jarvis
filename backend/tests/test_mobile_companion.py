@@ -113,16 +113,21 @@ def test_companion_alias_redirect(client):
 
 def test_mobile_network_option_b_guard(client):
     """
-    CRITICAL SECURITY CHECK:
-    Verify backend remains bound to localhost (Option B) and explains limitation.
+    SECURITY CHECK (cloud-first):
+    Local dev still binds localhost by default, but the Companion's main
+    path is now cloud sign-in — the old "Localhost-Only mode (Option B)"
+    copy was replaced. Tailscale pairing survives only as a labelled
+    legacy section, not the main path.
     """
     assert settings.HOST == "127.0.0.1"
 
     res = client.get("/mobile/")
     assert res.status_code == 200
-    # Must communicate Localhost-Only mode (Option B)
-    assert "Localhost-Only mode (Option B)" in res.text
-    assert "Phone-to-laptop remote commands" in res.text
+    # Cloud sign-in is the main path offered by the UI.
+    assert "Sign in with Google" in res.text
+    assert "Localhost-Only mode (Option B)" not in res.text
+    # Tailscale is still present, but explicitly labelled legacy.
+    assert "Legacy: laptop pairing (Tailscale)" in res.text
 
 
 def test_mobile_command_history_privacy_controls(client):

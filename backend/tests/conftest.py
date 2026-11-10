@@ -4,6 +4,9 @@ from starlette.testclient import TestClient
 
 from app.core.config import settings
 from app.core.rate_limiter import auth_rate_limiter
+from app.core.store import reset_user_store
+from app.core.usage_limiter import usage_limiter
+from app.core.user_context import set_current_user
 from app.main import app
 from app.tools.reminders_tools import reminders_storage
 from app.tools.memory_tools import memory_storage
@@ -39,6 +42,15 @@ def setup_isolated_env(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(settings, "MAX_FILE_READ_BYTES", 1024 * 50)  # 50 KB for test
     monkeypatch.setattr(settings, "MAX_REQUEST_LENGTH", 500)
     monkeypatch.setattr(settings, "MEMORY_ENABLED", True)
+    # Phase 12: cloud-auth defaults for tests. Local mode by default (existing
+    # tests exercise the loopback owner path); cloud tests flip CLOUD_MODE on.
+    monkeypatch.setattr(settings, "SESSION_SECRET", "test-session-secret-0123456789abcdef-test-value")
+    monkeypatch.setattr(settings, "KEY_ENCRYPTION_KEY", "")
+    monkeypatch.setattr(settings, "CLOUD_MODE", False)
+    monkeypatch.setattr(settings, "DATABASE_URL", None)
+    reset_user_store()
+    usage_limiter.reset()
+    set_current_user(None)
 
     monkeypatch.setattr(reminders_storage, "file_path", test_reminders)
     monkeypatch.setattr(memory_storage, "file_path", test_memories)
@@ -54,6 +66,9 @@ def setup_isolated_env(tmp_path: Path, monkeypatch):
         "memories": test_memories,
         "logs": test_logs,
     }
+    reset_user_store()
+    usage_limiter.reset()
+    set_current_user(None)
 
 
 @pytest.fixture

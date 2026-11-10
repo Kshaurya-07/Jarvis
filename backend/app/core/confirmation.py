@@ -15,6 +15,9 @@ class PendingAction(BaseModel):
     created_at: float = Field(default_factory=time.time)
     expires_at: float
     confirmed: bool = False
+    # Google `sub` namespace of the user who requested it (None = legacy/local).
+    # A confirmation can only be approved by the user who created it.
+    user_sub: Optional[str] = None
 
 
 class ConfirmationManager:
@@ -31,10 +34,11 @@ class ConfirmationManager:
         tool_name: str,
         arguments: Dict[str, Any],
         description: str,
+        user: Optional[Any] = None,
     ) -> PendingAction:
         """Create and store a pending action requiring confirmation."""
         self.cleanup_expired()
-        
+
         # Safe arguments copy (remove any confirmation_id from comparison)
         safe_args = {k: v for k, v in arguments.items() if k != "confirmation_id"}
 
@@ -47,6 +51,7 @@ class ConfirmationManager:
             created_at=time.time(),
             expires_at=time.time() + self._timeout_seconds,
             confirmed=False,
+            user_sub=(user.sub if user is not None else None),
         )
         self._pending[conf_id] = action
         return action
@@ -56,10 +61,12 @@ class ConfirmationManager:
         self.cleanup_expired()
         return self._pending.get(confirmation_id)
 
-    def confirm_action(self, confirmation_id: str) -> Optional[PendingAction]:
-        """Explicitly confirm a pending action."""
+    def confirm_action(self, confirmation_id: str, user: Optional[Any] = None) -> Optional[PendingAction]:
+        """Explicitly confirm a pending action (only its owner may confirm)."""
         action = self.get_action(confirmation_id)
         if action:
+            if user is not None and action.user_sub is not None and action.user_sub != user.sub:
+                return None
             action.confirmed = True
             return action
         return None
@@ -69,6 +76,7 @@ class ConfirmationManager:
         confirmation_id: str,
         tool_name: str,
         arguments: Dict[str, Any],
+        user: Optional[Any] = None,
     ) -> bool:
         """
         Validates that a valid, unexpired, confirmed token exists and matches
@@ -78,6 +86,10 @@ class ConfirmationManager:
 
         action = self._pending.get(confirmation_id)
         if not action:
+            return False
+
+        # Owner check: a confirmation belongs to the user who created it.
+        if user is not None and action.user_sub is not None and action.user_sub != user.sub:
             return False
 
         # Verify tool name matches
@@ -97,17 +109,23 @@ class ConfirmationManager:
         del self._pending[confirmation_id]
         return True
 
-    def deny_action(self, confirmation_id: str) -> bool:
-        """Deny and cancel a pending action."""
+    def deny_action(self, confirmation_id: str, user: Optional[Any] = None) -> bool:
+        """Deny and cancel a pending action (only its owner may deny)."""
+        action = self._pending.get(confirmation_id)
+        if action is not None and user is not None and action.user_sub is not None and action.user_sub != user.sub:
+            return False
         if confirmation_id in self._pending:
             del self._pending[confirmation_id]
             return True
         return False
 
-    def list_pending(self) -> List[PendingAction]:
-        """List all currently active pending actions."""
+    def list_pending(self, user: Optional[Any] = None) -> List[PendingAction]:
+        """List currently active pending actions (only the caller's own)."""
         self.cleanup_expired()
-        return [act for act in self._pending.values() if not act.confirmed]
+        items = [act for act in self._pending.values() if not act.confirmed]
+        if user is not None:
+            items = [a for a in items if a.user_sub is None or a.user_sub == user.sub]
+        return items
 
     def cleanup_expired(self) -> None:
         """Remove expired confirmations."""

@@ -4,8 +4,8 @@ from app import __version__
 from app.core.config import settings
 from app.core.logger import app_logger
 from app.services.agent_service import agent_service
-from app.tools.memory_tools import memory_storage
-from app.tools.reminders_tools import reminders_storage
+from app.core.store import get_user_store
+from app.core.user_context import get_current_user, resolve_user, user_paths
 
 
 DEMO_STEPS = [
@@ -58,11 +58,13 @@ class DemoManager:
     Keeps mock/demo data strictly isolated from real user data.
     """
 
-    def get_status(self) -> Dict[str, Any]:
-        """Return current status of the demo environment."""
-        demo_notes = [f for f in settings.NOTES_DIR.glob("*.md") if f.name.startswith("demo_") or "[demo]" in f.name.lower()] if settings.NOTES_DIR.exists() else []
-        demo_reminders = [r for r in reminders_storage.list_all(include_completed=True) if r.title.strip().upper().startswith("[DEMO]")]
-        demo_memories = [m for m in memory_storage.list_all() if m.key.startswith("demo_")]
+    def get_status(self, user=None) -> Dict[str, Any]:
+        """Return current status of the demo environment (caller's own data)."""
+        _u = resolve_user(user or get_current_user())
+        _store = get_user_store()
+        demo_notes = [n for n in _store.list_notes(_u) if n["filename"].startswith("demo_") or "[demo]" in n["filename"].lower()]
+        demo_reminders = [r for r in _store.list_reminders(_u, include_completed=True) if r["title"].strip().upper().startswith("[DEMO]")]
+        demo_memories = [m for m in _store.list_memories(_u) if m["key"].startswith("demo_")]
 
         return {
             "demo_version": "1.0",
@@ -83,13 +85,16 @@ class DemoManager:
             ),
         }
 
-    def seed_demo_data(self) -> Dict[str, Any]:
+    def seed_demo_data(self, user=None) -> Dict[str, Any]:
         """
         Seed safe, fictional mock data for testing notes, reminders, and memory.
         Every seeded item is explicitly tagged with '[DEMO]'.
         """
-        settings.NOTES_DIR.mkdir(parents=True, exist_ok=True)
-        demo_note_file = settings.NOTES_DIR / "demo_europa_mission_notes.md"
+        _u = resolve_user(user or get_current_user())
+        _store = get_user_store()
+        paths = user_paths(_u)
+        paths.notes_dir.mkdir(parents=True, exist_ok=True)
+        demo_note_file = paths.notes_dir / "demo_europa_mission_notes.md"
         demo_note_content = (
             "# [DEMO] Europa Deep Horizon Mission Brief\n\n"
             "- Target Launch: October 2032\n"
@@ -98,20 +103,24 @@ class DemoManager:
             "- Payload Instruments: Deep-Ice Radar Sounder (DIRS), Sub-Plume Mass Spectrometer (SPMS)\n\n"
             "Notice: Fictional mission notes for Jarvis Phase 10 demo testing only."
         )
-        demo_note_file.write_text(demo_note_content, encoding="utf-8")
+        if _store.name == "postgres":
+            _store.create_note(_u, "demo_europa_mission_notes", demo_note_content)
+        else:
+            demo_note_file.write_text(demo_note_content, encoding="utf-8")
 
         # Seed reminder
         rem_title = "[DEMO] Review Europa mission science objectives"
-        existing = [r for r in reminders_storage.list_all(include_completed=True) if r.title == rem_title]
+        existing = [r for r in _store.list_reminders(_u, include_completed=True) if r["title"] == rem_title]
         if not existing:
-            reminders_storage.add(
+            _store.add_reminder(
+                _u,
                 title=rem_title,
                 due_time="2032-10-01T14:00:00Z",
                 notes="Fictional study reminder for Jarvis Phase 10 demo.",
             )
 
         # Seed memory
-        memory_storage.put("demo_favorite_mission", "Europa Deep Horizon 2032")
+        _store.put_memory(_u, "demo_favorite_mission", "Europa Deep Horizon 2032")
 
         return {
             "status": "seeded",
@@ -124,34 +133,36 @@ class DemoManager:
             "note_file": str(demo_note_file.name),
         }
 
-    def clear_demo_data(self) -> Dict[str, Any]:
+    def clear_demo_data(self, user=None) -> Dict[str, Any]:
         """
         One-step deletion of mock/demo data without touching real user data.
         Removes only files and records with 'demo_' prefix or '[DEMO]' tag.
         """
+        _u = resolve_user(user or get_current_user())
+        _store = get_user_store()
+        paths = user_paths(_u)
         deleted_notes = 0
-        if settings.NOTES_DIR.exists():
-            for f in list(settings.NOTES_DIR.glob("*.md")):
-                if f.name.startswith("demo_") or "[demo]" in f.name.lower():
-                    try:
-                        f.unlink()
+        for n in _store.list_notes(_u):
+            if n["filename"].startswith("demo_") or "[demo]" in n["filename"].lower():
+                try:
+                    if _store.delete_note(_u, n["filename"]):
                         deleted_notes += 1
-                    except Exception as e:
-                        app_logger.warning("Failed to delete demo note '%s': %s", f.name, e)
+                except Exception as e:
+                    app_logger.warning("Failed to delete demo note '%s': %s", n["filename"], e)
 
         # Delete demo reminders
         deleted_reminders = 0
-        all_reminders = reminders_storage.list_all(include_completed=True)
+        all_reminders = _store.list_reminders(_u, include_completed=True)
         for r in all_reminders:
-            if r.title.strip().upper().startswith("[DEMO]"):
-                if reminders_storage.delete(r.id):
+            if r["title"].strip().upper().startswith("[DEMO]"):
+                if _store.delete_reminder(_u, r["id"]):
                     deleted_reminders += 1
 
         # Delete demo memories
         deleted_memories = 0
-        for m in memory_storage.list_all():
-            if m.key.startswith("demo_"):
-                if memory_storage.delete(m.key):
+        for m in _store.list_memories(_u):
+            if m["key"].startswith("demo_"):
+                if _store.delete_memory(_u, m["key"]):
                     deleted_memories += 1
 
         return {

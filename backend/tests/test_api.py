@@ -38,12 +38,15 @@ def test_chat_exceeds_length_validation(client):
 
 
 def test_chat_without_api_key(client):
-    # With no key set, chat should return a clear, user-friendly response rather than crashing
+    # BYOK (Phase 12): with no per-user Gemini key saved, chat returns a clear,
+    # user-friendly prompt to add their own free key rather than crashing.
+    # There is deliberately no server/owner key fallback.
     response = client.post("/api/chat", json={"message": "What files do I have?"})
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is False
-    assert "GEMINI_API_KEY" in data["reply"]
+    assert "Gemini key" in data["reply"]
+    assert data["error"] == "no_user_gemini_key"
 
 
 def test_chat_with_mocked_agent(client):

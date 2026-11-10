@@ -23,6 +23,7 @@ class DailyBriefingResult(BaseModel):
 async def build_daily_briefing(
     include_web_summary: bool = False,
     web_topics: Optional[str] = None,
+    user=None,
 ) -> ToolResult:
     """
     Assembles an on-demand daily briefing from local reminders, local notes/tasks,
@@ -36,9 +37,17 @@ async def build_daily_briefing(
     now = datetime.datetime.now(datetime.timezone.utc)
     now_str = now.strftime("%Y-%m-%d %H:%M UTC")
 
+    from app.core.store import get_user_store
+    from app.core.user_context import get_current_user, resolve_user
+
+    _u = resolve_user(user or get_current_user())
+    _store = get_user_store()
+
     # 1. Gather Local Reminders
     try:
-        active_reminders = reminders_storage.list_all(include_completed=False)
+        from types import SimpleNamespace
+
+        active_reminders = [SimpleNamespace(**r) for r in _store.list_reminders(_u, include_completed=False)]
         today_date_str = now.strftime("%Y-%m-%d")
 
         reminders_summary = []
@@ -54,13 +63,13 @@ async def build_daily_briefing(
             })
 
         reminders_section = {
-            "source": "Local Store (data/reminders.json)",
+            "source": "Your Jarvis account (reminders)",
             "count": len(reminders_summary),
             "items": reminders_summary,
         }
     except Exception as e:
         reminders_section = {
-            "source": "Local Store (data/reminders.json)",
+            "source": "Your Jarvis account (reminders)",
             "count": 0,
             "error": f"Failed to read reminders: {str(e)}",
             "items": [],
@@ -68,39 +77,26 @@ async def build_daily_briefing(
 
     # 2. Gather Recent Local Notes & Tasks
     notes_section = {
-        "source": "Local Storage (notes/)",
+        "source": "Your Jarvis account (notes)",
         "count": 0,
         "items": [],
     }
     try:
-        notes_dir = settings.NOTES_DIR
-        if notes_dir.exists():
-            recent_notes = sorted(
-                list(notes_dir.glob("*.md")) + list(notes_dir.glob("*.txt")),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )[:5]  # Top 5 most recent notes
-
-            note_items = []
-            for note_path in recent_notes:
-                try:
-                    text = note_path.read_text(encoding="utf-8", errors="replace")
-                    lines = [line.strip() for line in text.splitlines() if line.strip()]
-                    title = lines[0].lstrip("# ").strip() if lines else note_path.stem
-                    
-                    # Look for checklist items or TODOs
-                    todos = [line for line in lines if line.startswith("- [ ]") or "todo:" in line.lower()][:3]
-                    
-                    note_items.append({
-                        "filename": note_path.name,
-                        "title": title,
-                        "tasks_preview": todos if todos else lines[1:3],
-                    })
-                except Exception:
-                    continue
-
-            notes_section["count"] = len(note_items)
-            notes_section["items"] = note_items
+        recent = _store.list_notes(_u)
+        recent = sorted(recent, key=lambda n: n.get("modified_at") or "", reverse=True)[:5]
+        note_items = []
+        for note in recent:
+            text = note.get("content", "")
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            title = lines[0].lstrip("# ").strip() if lines else note.get("title") or note.get("filename", "")
+            todos = [line for line in lines if line.startswith("- [ ]") or "todo:" in line.lower()][:3]
+            note_items.append({
+                "filename": note.get("filename", ""),
+                "title": title,
+                "tasks_preview": todos if todos else lines[1:3],
+            })
+        notes_section["count"] = len(note_items)
+        notes_section["items"] = note_items
     except Exception as e:
         notes_section["error"] = f"Failed to inspect notes: {str(e)}"
 
@@ -128,7 +124,7 @@ async def build_daily_briefing(
             }
 
     attribution_note = (
-        "Attribution: Reminders and Notes are stored exclusively on your local laptop. "
+        "Attribution: Reminders and Notes come from your Jarvis account. "
         "Web search items (if included) are external results and must be cited with links."
     )
 
@@ -154,6 +150,7 @@ async def build_daily_briefing(
 def get_daily_briefing(
     include_web_summary: bool = False,
     web_topics: Optional[str] = None,
+    user=None,
 ) -> ToolResult:
     """
     Synchronous wrapper for tool registry dispatch.
@@ -167,10 +164,10 @@ def get_daily_briefing(
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 return pool.submit(
                     asyncio.run,
-                    build_daily_briefing(include_web_summary, web_topics),
+                    build_daily_briefing(include_web_summary, web_topics, user=user),
                 ).result()
         return loop.run_until_complete(
-            build_daily_briefing(include_web_summary, web_topics)
+            build_daily_briefing(include_web_summary, web_topics, user=user)
         )
     except Exception as e:
         return ToolResult(success=False, error=f"Failed to generate briefing: {str(e)}")

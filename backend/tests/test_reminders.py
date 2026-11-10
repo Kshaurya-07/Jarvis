@@ -19,7 +19,7 @@ def test_create_reminder_success():
     assert result.output["reminder"]["title"] == "Dentist Appointment"
     assert result.output["reminder"]["due_time"] == "Tomorrow at 3:00 PM"
     assert result.output["reminder"]["completed"] is False
-    assert "stored locally" in result.output["notice"]
+    assert "cloud account" in result.output["notice"]
 
 
 def test_create_reminder_validation_errors():

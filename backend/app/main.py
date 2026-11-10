@@ -34,6 +34,10 @@ TAILSCALE_HOST_REGEX = re.compile(
     r"^([a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.ts\.net|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$"
 )
 
+# Vercel deployment hosts (*.vercel.app) — the backend itself runs on Vercel
+# in cloud mode, so its own Host header is a vercel.app domain.
+VERCEL_HOST_REGEX = re.compile(r"^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.vercel\.app(:\d+)?$")
+
 
 def is_allowed_origin(origin: str) -> bool:
     """
@@ -49,6 +53,9 @@ def is_allowed_origin(origin: str) -> bool:
         return True
     if clean_origin in settings.ALLOWED_ORIGINS:
         return True
+    # The configured frontend origin (same Vercel project) is always allowed.
+    if settings.FRONTEND_URL and clean_origin == settings.FRONTEND_URL.strip().rstrip("/"):
+        return True
     return bool(ALLOWED_ORIGIN_REGEX.match(origin))
 
 
@@ -60,6 +67,10 @@ def is_allowed_host(host_header: str) -> bool:
     if bool(ALLOWED_HOST_REGEX.match(host_clean)):
         return True
     if bool(TAILSCALE_HOST_REGEX.match(host_clean)):
+        return True
+    # Cloud mode: the backend runs on Vercel, so its own *.vercel.app host
+    # (and the frontend's host, for same-project calls) must be accepted.
+    if settings.CLOUD_MODE and bool(VERCEL_HOST_REGEX.match(host_clean)):
         return True
     if settings.TAILSCALE_HOST and host_clean.startswith(settings.TAILSCALE_HOST):
         return True
@@ -73,6 +84,8 @@ def is_allowed_referer(referer: str) -> bool:
     for approved in APPROVED_STATIC_ORIGINS:
         if referer.startswith(approved):
             return True
+    if settings.FRONTEND_URL and referer.startswith(settings.FRONTEND_URL.strip().rstrip("/")):
+        return True
     for custom in settings.ALLOWED_ORIGINS:
         if referer.startswith(custom):
             return True
@@ -97,10 +110,15 @@ async def lifespan(app: FastAPI):
 
     app_logger.info("=" * 50)
     app_logger.info("Jarvis Agent Backend starting up (v%s)", __version__)
-    app_logger.info("Workspace directory: %s", settings.WORKSPACE_DIR)
-    app_logger.info("Notes directory: %s", settings.NOTES_DIR)
-    app_logger.info("Data directory: %s", settings.DATA_DIR)
-    app_logger.info("Backups directory: %s", settings.BACKUPS_DIR)
+    if settings.CLOUD_MODE:
+        from app.core.store import get_user_store
+
+        app_logger.info("Cloud mode: sign-in required; storage backend: %s", get_user_store().name)
+    else:
+        app_logger.info("Workspace directory: %s", settings.WORKSPACE_DIR)
+        app_logger.info("Notes directory: %s", settings.NOTES_DIR)
+        app_logger.info("Data directory: %s", settings.DATA_DIR)
+        app_logger.info("Backups directory: %s", settings.BACKUPS_DIR)
     app_logger.info("Bound to: %s:%d (remote access: %s)", settings.HOST, settings.PORT, settings.ALLOW_REMOTE_ACCESS)
     app_logger.info("=" * 50)
     yield
@@ -195,10 +213,16 @@ async def origin_validation_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# Enable CORS for localhost, Chrome extensions, and approved Vercel static PWA origins
+# Enable CORS for localhost, Chrome extensions, and approved Vercel static PWA origins.
+# Same-project deployment (frontend + backend on Vercel) is same-origin for
+# /api calls, so CORS is mostly a safety net for the PWA on its own domain.
+_frontend_origin = settings.FRONTEND_URL.strip().rstrip("/") if settings.FRONTEND_URL else ""
+_cors_origins = list(dict.fromkeys(
+    APPROVED_STATIC_ORIGINS + settings.ALLOWED_ORIGINS + ([_frontend_origin] if _frontend_origin else [])
+))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=APPROVED_STATIC_ORIGINS + settings.ALLOWED_ORIGINS,
+    allow_origins=_cors_origins,
     allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-zA-Z0-9]+)$",
     allow_credentials=True,
     allow_methods=["*"],

@@ -2,7 +2,7 @@ import datetime
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -43,10 +43,17 @@ class ActionLogEntry(BaseModel):
     status: str  # "success" or "failure"
     details: Optional[str] = None
     execution_time_ms: Optional[float] = None
+    # Namespace of the user the action belongs to (None = legacy/local).
+    user_sub: Optional[str] = None
 
 
 class ActionLogger:
-    """Records audit logs for agent actions without logging sensitive data."""
+    """Records audit logs for agent actions without logging sensitive data.
+
+    Entries are namespaced per user and written through the active
+    UserStore (Postgres in production, per-user JSONL file locally), so one
+    user can never read another user's audit trail.
+    """
 
     def __init__(self, log_file: Optional[Path] = None, max_memory_entries: int = 200):
         self.log_file = log_file or settings.ACTION_LOG_FILE
@@ -59,6 +66,7 @@ class ActionLogger:
         status: str,
         details: Optional[str] = None,
         execution_time_ms: Optional[float] = None,
+        user: Optional[Any] = None,
     ) -> ActionLogEntry:
         """
         Record a tool action to in-memory history and append to the action log file.
@@ -71,11 +79,15 @@ class ActionLogger:
             # Truncate details if overly long
             safe_details = scrubbed[:300] if len(scrubbed) > 300 else scrubbed
 
+        from app.core.user_context import resolve_user
+
+        resolved = resolve_user(user)
         entry = ActionLogEntry(
             tool_name=tool_name,
             status=status,
             details=safe_details,
             execution_time_ms=execution_time_ms,
+            user_sub=resolved.namespace,
         )
 
         # Store in memory
@@ -83,11 +95,26 @@ class ActionLogger:
         if len(self._memory_entries) > self.max_memory_entries:
             self._memory_entries.pop(0)
 
-        # Append to disk log file
+        # Append to durable per-user log via the active store. Failures here
+        # must never break the tool call itself.
         try:
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(entry.model_dump_json() + "\n")
+            from app.core.store import get_user_store
+
+            get_user_store().append_action(resolved, entry.model_dump())
+        except Exception as e:
+            app_logger.warning("Failed to write to action log: %s", e)
+
+        # Backwards compatibility: a logger constructed with an explicit
+        # log_file (e.g. in tests) also writes there, unless that is already
+        # the store's per-user log file for this user.
+        try:
+            from app.core.user_context import user_paths
+
+            store_path = user_paths(resolved).action_log_file.resolve()
+            if self.log_file is not None and Path(self.log_file).resolve() != store_path:
+                self.log_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.log_file, "a", encoding="utf-8") as f:
+                    f.write(entry.model_dump_json() + "\n")
         except Exception as e:
             app_logger.warning("Failed to write to action log file: %s", e)
 
@@ -100,9 +127,15 @@ class ActionLogger:
         )
         return entry
 
-    def get_recent_actions(self, limit: int = 50) -> List[ActionLogEntry]:
-        """Returns the most recent in-memory action entries."""
-        return self._memory_entries[-limit:]
+    def get_recent_actions(self, limit: int = 50, user: Optional[Any] = None) -> List[ActionLogEntry]:
+        """Returns the most recent in-memory action entries (caller's own only)."""
+        entries = self._memory_entries
+        if user is not None:
+            from app.core.user_context import resolve_user
+
+            ns = resolve_user(user).namespace
+            entries = [e for e in entries if e.user_sub in (None, ns)]
+        return entries[-limit:]
 
 
 # Global instance

@@ -43,6 +43,7 @@ class OAuthPendingState:
     code_verifier: str
     created_at: float
     redirect_uri: str
+    purpose: str = "gmail"  # "gmail" (read-only Gmail/Calendar) or "login" (sign-in)
 
 
 class GoogleAuthManager:
@@ -114,6 +115,90 @@ class GoogleAuthManager:
         query_parts = [f"{k}={httpx.URL('', params={k: v}).query.decode('utf-8')}" for k, v in params.items()]
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{'&'.join(query_parts)}"
         return auth_url, state
+
+    # -- Phase 12: Google sign-in (login), separate from Gmail/Calendar --
+    def create_login_authorization_url(self) -> tuple:
+        """Build the Google sign-in URL (scopes: openid/email/profile only).
+
+        Returns (auth_url, state, code_verifier, redirect_uri). The caller
+        stores state+verifier in a *signed cookie* (see app.core.session),
+        not in server memory, so the flow survives Vercel cold starts.
+        No Google password is ever seen or stored — Google handles sign-in.
+        """
+        if not settings.GOOGLE_CLIENT_ID:
+            raise GoogleConfigError(
+                "Google Client ID is not configured. Set GOOGLE_CLIENT_ID and "
+                "GOOGLE_CLIENT_SECRET in your environment. See README.md."
+            )
+        redirect_uri = settings.GOOGLE_LOGIN_REDIRECT_URI
+        code_verifier, code_challenge = self.generate_pkce_pair()
+        state = secrets.token_urlsafe(32)
+        scopes_str = " ".join(settings.GOOGLE_LOGIN_SCOPES)
+        params = {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes_str,
+            "access_type": "online",
+            "prompt": "select_account",
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
+        query_parts = [f"{k}={httpx.URL('', params={k: v}).query.decode('utf-8')}" for k, v in params.items()]
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{'&'.join(query_parts)}"
+        return auth_url, state, code_verifier, redirect_uri
+
+    def exchange_login_code(self, code: str, code_verifier: str, redirect_uri: str) -> Dict[str, Any]:
+        """Exchange a login authorization code for the user's Google identity.
+
+        Verifies Google's ID token (signature, audience, expiry) with
+        ``google.oauth2.id_token`` and returns ``sub``/``email``/``name``.
+        The access token is discarded — sign-in needs no Gmail/Calendar
+        access, and nothing is stored in keyring for login.
+        """
+        if not settings.GOOGLE_CLIENT_ID:
+            raise GoogleConfigError("GOOGLE_CLIENT_ID is not configured.")
+        data = {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "code": code,
+            "code_verifier": code_verifier,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        }
+        if settings.GOOGLE_CLIENT_SECRET:
+            data["client_secret"] = settings.GOOGLE_CLIENT_SECRET
+        try:
+            with httpx.Client(trust_env=False, timeout=10.0) as client:
+                resp = client.post("https://oauth2.googleapis.com/token", data=data)
+                if resp.status_code != 200:
+                    err_json = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+                    err_desc = err_json.get("error_description", resp.text)
+                    raise GoogleAuthError(f"Token exchange failed (HTTP {resp.status_code}): {err_desc}")
+                token_data = resp.json()
+        except httpx.RequestError as exc:
+            raise GoogleAuthError(f"Network error during token exchange: {str(exc)}") from exc
+
+        id_token = token_data.get("id_token")
+        if not id_token:
+            raise GoogleAuthError("Google did not return an ID token for sign-in.")
+        try:
+            from google.oauth2 import id_token as google_id_token
+
+            claims = google_id_token.verify_oauth2_token(
+                id_token, GoogleAuthRequest(), settings.GOOGLE_CLIENT_ID
+            )
+        except Exception as exc:
+            raise GoogleAuthError(f"Google ID token verification failed: {exc}") from exc
+        sub = claims.get("sub")
+        if not sub:
+            raise GoogleAuthError("Google ID token has no user ID (sub).")
+        return {
+            "sub": sub,
+            "email": claims.get("email"),
+            "name": claims.get("name"),
+            "picture": claims.get("picture"),
+        }
 
     def validate_and_consume_state(self, state: str) -> OAuthPendingState:
         """

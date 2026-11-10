@@ -2,11 +2,19 @@ import re
 
 import psutil
 
+from app.core.config import settings
 from app.core.security import verify_windows_os, UnsupportedPlatformError
+
+_CLOUD_MSG = (
+    "System status is a local-only feature: it reads a physical laptop's battery, "
+    "disk and RAM, which a cloud server does not have. Not available in cloud mode."
+)
 from app.tools.base import ToolResult
 
 
 def get_battery_status() -> ToolResult:
+    if settings.CLOUD_MODE:
+        return ToolResult(success=False, error=_CLOUD_MSG)
     """
     Retrieve current battery status, charge level, and power source.
     Read-only hardware status tool.
@@ -62,6 +70,8 @@ def get_battery_status() -> ToolResult:
 
 
 def get_storage_status(drive: str = "C:") -> ToolResult:
+    if settings.CLOUD_MODE:
+        return ToolResult(success=False, error=_CLOUD_MSG)
     """
     Retrieve disk storage status for a specified drive.
     Read-only storage status tool.
@@ -129,6 +139,8 @@ def get_storage_status(drive: str = "C:") -> ToolResult:
 
 
 def get_memory_status() -> ToolResult:
+    if settings.CLOUD_MODE:
+        return ToolResult(success=False, error=_CLOUD_MSG)
     """
     Retrieve current RAM (memory) usage metrics.
     Read-only system status tool.

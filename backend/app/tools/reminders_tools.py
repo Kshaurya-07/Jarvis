@@ -106,13 +106,12 @@ class RemindersStorage:
 reminders_storage = RemindersStorage()
 
 DISCLAIMER_TEXT = (
-    "Note: Reminders are stored locally on this machine without background OS daemon services. "
-    "Notifications occur while Jarvis is running; if the laptop is asleep or the backend is closed, "
-    "reminders remain saved and will be reported on your next check."
+    "Note: Reminders are stored in your Jarvis cloud account and shown when you open the app. "
+    "There are no push notifications yet — check the app for what's due."
 )
 
 
-def create_reminder(title: str, due_time: str, notes: Optional[str] = None) -> ToolResult:
+def create_reminder(title: str, due_time: str, notes: Optional[str] = None, user=None) -> ToolResult:
     """
     Create and store a local reminder on the laptop.
     
@@ -127,15 +126,17 @@ def create_reminder(title: str, due_time: str, notes: Optional[str] = None) -> T
         return ToolResult(success=False, error="Argument 'due_time' is required and must be non-empty.")
 
     try:
-        reminder = reminders_storage.add(
-            title=title,
-            due_time=due_time,
-            notes=str(notes) if notes else None,
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        reminder = get_user_store().add_reminder(
+            u, title=title, due_time=due_time, notes=str(notes) if notes else None
         )
         return ToolResult(
             success=True,
             output={
-                "reminder": reminder.model_dump(),
+                "reminder": reminder,
                 "notice": DISCLAIMER_TEXT,
             },
         )
@@ -143,7 +144,7 @@ def create_reminder(title: str, due_time: str, notes: Optional[str] = None) -> T
         return ToolResult(success=False, error=f"Failed to save reminder: {str(e)}")
 
 
-def list_reminders(include_completed: bool = False) -> ToolResult:
+def list_reminders(include_completed: bool = False, user=None) -> ToolResult:
     """
     List local reminders.
     
@@ -151,12 +152,16 @@ def list_reminders(include_completed: bool = False) -> ToolResult:
         include_completed: Whether to include already completed reminders (default False).
     """
     try:
-        reminders = reminders_storage.list_all(include_completed=include_completed)
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        reminders = get_user_store().list_reminders(u, include_completed=include_completed)
         return ToolResult(
             success=True,
             output={
                 "count": len(reminders),
-                "reminders": [r.model_dump() for r in reminders],
+                "reminders": reminders,
                 "notice": DISCLAIMER_TEXT,
             },
         )
@@ -164,7 +169,7 @@ def list_reminders(include_completed: bool = False) -> ToolResult:
         return ToolResult(success=False, error=f"Failed to list reminders: {str(e)}")
 
 
-def complete_reminder(reminder_id: str) -> ToolResult:
+def complete_reminder(reminder_id: str, user=None) -> ToolResult:
     """
     Mark a local reminder as completed.
     
@@ -176,21 +181,25 @@ def complete_reminder(reminder_id: str) -> ToolResult:
 
     clean_id = reminder_id.strip()
     try:
-        reminder = reminders_storage.complete(clean_id)
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        reminder = get_user_store().complete_reminder(u, clean_id)
         if not reminder:
             return ToolResult(success=False, error=f"Reminder with ID '{clean_id}' was not found.")
         return ToolResult(
             success=True,
             output={
-                "message": f"Reminder '{reminder.title}' marked as completed.",
-                "reminder": reminder.model_dump(),
+                "message": f"Reminder '{reminder['title']}' marked as completed.",
+                "reminder": reminder,
             },
         )
     except Exception as e:
         return ToolResult(success=False, error=f"Failed to complete reminder: {str(e)}")
 
 
-def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None) -> ToolResult:
+def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None, user=None) -> ToolResult:
     """
     Delete a local reminder. Requires explicit confirmation before deletion.
     
@@ -201,8 +210,12 @@ def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None) -> 
     if not isinstance(reminder_id, str) or not reminder_id.strip():
         return ToolResult(success=False, error="Argument 'reminder_id' is required.")
 
+    from app.core.store import get_user_store
+    from app.core.user_context import get_current_user, resolve_user
+
+    u = resolve_user(user or get_current_user())
     clean_id = reminder_id.strip()
-    reminder = reminders_storage.get_by_id(clean_id)
+    reminder = get_user_store().get_reminder(u, clean_id)
     if not reminder:
         return ToolResult(success=False, error=f"Reminder with ID '{clean_id}' was not found.")
 
@@ -213,6 +226,7 @@ def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None) -> 
             confirmation_id=confirmation_id.strip(),
             tool_name="delete_reminder",
             arguments=action_args,
+            user=u,
         )
         if not is_valid:
             return ToolResult(
@@ -226,12 +240,13 @@ def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None) -> 
         pending = confirmation_manager.create_pending_action(
             tool_name="delete_reminder",
             arguments=action_args,
-            description=f"Delete reminder '{reminder.title}' ({clean_id})",
+            description=f"Delete reminder '{reminder['title']}' ({clean_id})",
+            user=u,
         )
         return ToolResult(
             success=False,
             error=(
-                f"Confirmation required: Deleting reminder '{reminder.title}' cannot be undone. "
+                f"Confirmation required: Deleting reminder '{reminder['title']}' cannot be undone. "
                 f"Please confirm this action with confirmation_id '{pending.confirmation_id}'."
             ),
             output={
@@ -239,17 +254,17 @@ def delete_reminder(reminder_id: str, confirmation_id: Optional[str] = None) -> 
                 "confirmation_id": pending.confirmation_id,
                 "action": "delete_reminder",
                 "reminder_id": clean_id,
-                "title": reminder.title,
+                "title": reminder["title"],
             },
         )
 
     # Perform deletion
-    deleted = reminders_storage.delete(clean_id)
+    deleted = get_user_store().delete_reminder(u, clean_id)
     if deleted:
         return ToolResult(
             success=True,
             output={
-                "message": f"Reminder '{reminder.title}' ({clean_id}) was successfully deleted.",
+                "message": f"Reminder '{reminder['title']}' ({clean_id}) was successfully deleted.",
                 "reminder_id": clean_id,
             },
         )

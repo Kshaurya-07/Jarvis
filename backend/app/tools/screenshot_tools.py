@@ -37,7 +37,7 @@ def _grab_primary_display() -> Image.Image:
         )
 
 
-def capture_screenshot(confirmation_id: Optional[str] = None) -> ToolResult:
+def capture_screenshot(confirmation_id: Optional[str] = None, user=None) -> ToolResult:
     """
     Capture the primary display on Windows only when explicitly requested.
     Saves screenshot locally to the configured screenshots directory.
@@ -46,11 +46,20 @@ def capture_screenshot(confirmation_id: Optional[str] = None) -> ToolResult:
     Args:
         confirmation_id: Optional confirmation token if confirmation was already approved.
     """
+    if settings.CLOUD_MODE:
+        return ToolResult(
+            success=False,
+            error="Screenshots are a local-only feature: they capture a physical laptop screen, "
+            "which a cloud server does not have. Not available in cloud mode.",
+        )
     try:
         verify_windows_os("capture_screenshot")
     except UnsupportedPlatformError as e:
         return ToolResult(success=False, error=str(e))
 
+    from app.core.user_context import get_current_user, resolve_user, user_paths
+
+    _u = resolve_user(user or get_current_user())
     action_args: Dict[str, Any] = {}
 
     # Confirmation requirement check
@@ -59,6 +68,7 @@ def capture_screenshot(confirmation_id: Optional[str] = None) -> ToolResult:
             confirmation_id=confirmation_id.strip(),
             tool_name="capture_screenshot",
             arguments=action_args,
+            user=_u,
         )
         if not is_valid:
             return ToolResult(
@@ -73,6 +83,7 @@ def capture_screenshot(confirmation_id: Optional[str] = None) -> ToolResult:
             tool_name="capture_screenshot",
             arguments=action_args,
             description="Capture primary display screenshot and save to local disk.",
+            user=_u,
         )
         return ToolResult(
             success=False,
@@ -132,6 +143,7 @@ def analyze_screenshot(
     screenshot_filename: str,
     prompt: str = "Describe what is shown in this screenshot.",
     confirmation_id: Optional[str] = None,
+    user=None,
 ) -> ToolResult:
     """
     Analyze a previously captured local screenshot using Gemini multimodal vision.
@@ -142,10 +154,19 @@ def analyze_screenshot(
         prompt: Optional analytical question or instruction for the vision model.
         confirmation_id: Optional confirmation token if confirmation was already approved.
     """
+    if settings.CLOUD_MODE:
+        return ToolResult(
+            success=False,
+            error="Screenshot analysis is a local-only feature and is not available in cloud mode.",
+        )
     try:
         verify_windows_os("analyze_screenshot")
     except UnsupportedPlatformError as e:
         return ToolResult(success=False, error=str(e))
+
+    from app.core.user_context import get_current_user, resolve_user, user_paths
+
+    _u = resolve_user(user or get_current_user())
 
     if not isinstance(screenshot_filename, str) or not screenshot_filename.strip():
         return ToolResult(
@@ -159,7 +180,7 @@ def analyze_screenshot(
     # Resolve safe local path inside screenshots dir
     try:
         safe_path = resolve_safe_path(
-            base_dir=settings.SCREENSHOTS_DIR,
+            base_dir=user_paths(_u).screenshots_dir,
             user_path=clean_filename,
             allow_root=False,
             must_exist=True,
@@ -173,6 +194,7 @@ def analyze_screenshot(
             confirmation_id=confirmation_id.strip(),
             tool_name="analyze_screenshot",
             arguments=action_args,
+            user=_u,
         )
         if not is_valid:
             return ToolResult(
@@ -190,6 +212,7 @@ def analyze_screenshot(
                 f"Transmit local screenshot '{clean_filename}' to Google Gemini external API "
                 f"for visual analysis with prompt: '{prompt}'."
             ),
+            user=_u,
         )
         return ToolResult(
             success=False,

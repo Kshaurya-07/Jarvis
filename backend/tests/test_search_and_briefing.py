@@ -119,13 +119,13 @@ def test_daily_briefing_compilation_local_only():
     # Check local reminders section
     reminders = output["local_reminders"]
     assert reminders["count"] >= 1
-    assert "data/reminders.json" in reminders["source"]
+    assert "reminders" in reminders["source"]
     assert any("Submit Project Report" in item["title"] for item in reminders["items"])
 
     # Check local notes section
     notes = output["local_notes"]
     assert notes["count"] >= 1
-    assert "notes/" in notes["source"]
+    assert "notes" in notes["source"]
 
     # Web overview is None because include_web_summary was False
     assert output["web_overview"] is None

@@ -7,6 +7,8 @@ from google.genai import types
 
 from app.core.config import settings
 from app.core.logger import app_logger
+from app.core.store import get_user_store
+from app.core.user_context import UserIdentity, get_current_user, resolve_user
 from app.tools.registry import tool_registry
 
 
@@ -57,7 +59,7 @@ Safety & Privacy Rules:
 6. When the user confirms an action (e.g. provides the confirmation_id or states approval for a pending confirmation), pass the confirmation_id to the corresponding tool.
 7. CRITICAL MEMORY RULE: NEVER silently convert chat history into persistent memory. Only call remember_item when the user explicitly instructs you to remember something.
 8. NEVER save passwords, payment information, API keys, or authentication tokens into memory.
-9. Reminders are local: notifications occur when Jarvis is running and queried; if the laptop is asleep or the backend is closed, reminders remain stored without background daemons.
+9. Reminders live in the user's cloud account: they are stored per user and shown when the user opens the app. There are no push notifications yet.
 10. CITATION & WEB SEARCH RULES:
     - You MUST cite links in markdown format [Source: Title](URL) for claims based on search results.
     - Clearly distinguish sourced facts from your own explanations.
@@ -94,26 +96,51 @@ class AgentService:
     def __init__(self):
         self._client: Optional[genai.Client] = None
 
-    def _get_client(self) -> genai.Client:
-        """Lazily initialize and return the official Gemini client."""
-        api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
-        if not api_key or api_key.strip() in ("", "your_gemini_api_key_here"):
+    def _get_client(self, api_key: Optional[str] = None) -> genai.Client:
+        """Return a Gemini client for the given per-user (BYOK) key.
+
+        There is deliberately NO server/owner key fallback: every user pays
+        with their own key. Callers must resolve the key first (see
+        ``load_user_key``) and pass it in.
+        """
+        key = (api_key or "").strip()
+        if not key:
             raise ValueError(
-                "Gemini API key is not configured. Please set the GEMINI_API_KEY "
-                "environment variable or define it in your .env file."
+                "No Gemini API key for this user. The user needs to add their own "
+                "free Gemini key in Settings (Google AI Studio) before chatting."
             )
-        return genai.Client(api_key=api_key.strip())
+        return genai.Client(api_key=key)
 
-    def is_configured(self) -> bool:
-        """Check if a valid Gemini API key is configured."""
-        api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
-        return bool(api_key and api_key.strip() not in ("", "your_gemini_api_key_here"))
+    def is_configured(self, user: Optional[UserIdentity] = None) -> bool:
+        """Check whether this user has saved their own Gemini key (BYOK)."""
+        from app.core.byok import load_user_key
 
-    async def chat(self, user_message: str) -> AgentResponse:
+        return load_user_key(resolve_user(user or get_current_user())) is not None
+
+    @staticmethod
+    def _record_turn(user: UserIdentity, user_message: str, reply: str) -> None:
+        """Save one chat turn to the user's history (best-effort; never breaks chat)."""
+        try:
+            store = get_user_store()
+            store.append_chat(user, "user", user_message.strip())
+            store.append_chat(user, "assistant", reply or "")
+        except Exception as exc:
+            app_logger.warning("Could not save chat history: %s", exc)
+
+    async def chat(
+        self,
+        user_message: str,
+        user: Optional[UserIdentity] = None,
+        gemini_api_key: Optional[str] = None,
+    ) -> AgentResponse:
         """
         Process a user message through Gemini with tool calling.
         Executes approved tools and returns the synthesized assistant response.
+        Uses ONLY the calling user's own Gemini key (BYOK); there is no
+        shared server key. The turn is saved to that user's chat history so
+        it syncs across their devices.
         """
+        _u = resolve_user(user or get_current_user())
         if not user_message or not user_message.strip():
             return AgentResponse(
                 message="Message cannot be empty.",
@@ -128,13 +155,39 @@ class AgentService:
                 error="Message length limit exceeded.",
             )
 
+        from app.core.byok import load_user_key
+
+        api_key = gemini_api_key or load_user_key(_u)
+        if not api_key:
+            return AgentResponse(
+                message=(
+                    "You're signed in, but I need your own Gemini key before I can chat. "
+                    "Get a free key from Google AI Studio and add it in Settings → Your Gemini key — "
+                    "it takes about a minute, and the key stays yours."
+                ),
+                success=False,
+                error="no_user_gemini_key",
+            )
+
+        # Per-user usage cap (fat-finger / runaway-loop guard, not billing).
         try:
-            client = self._get_client()
+            from app.core.usage_limiter import usage_limiter
+
+            usage_limiter.check_and_record(_u, kind="gemini")
+        except Exception as e:
+            from fastapi import HTTPException
+
+            if isinstance(e, HTTPException):
+                return AgentResponse(message=str(e.detail), success=False, error="rate_limited")
+            raise
+
+        try:
+            client = self._get_client(api_key)
         except ValueError as e:
             return AgentResponse(
                 message=(
-                    "Jarvis core is running, but Gemini API is not yet configured. "
-                    "Please set your GEMINI_API_KEY in the .env file to enable AI reasoning and tool calling."
+                    "Your Gemini key could not be used. Please check it in Settings — "
+                    "it may have been removed or become unreadable."
                 ),
                 success=False,
                 error=str(e),
@@ -178,6 +231,7 @@ class AgentService:
                 if not function_calls:
                     # Model provided final text response
                     final_text = response.text or ""
+                    self._record_turn(_u, user_message, final_text)
                     return AgentResponse(
                         message=final_text,
                         tools_executed=executed_tools,
@@ -196,7 +250,8 @@ class AgentService:
                     tool_args = dict(fc.args) if fc.args else {}
 
                     # Execute tool via registry (performs validation & logging)
-                    result = tool_registry.execute_tool(tool_name, tool_args)
+                    # Tools run as this user, so they only touch this user's data.
+                    result = tool_registry.execute_tool(tool_name, tool_args, user=_u)
 
                     executed_tools.append(
                         ToolExecutionRecord(
@@ -222,6 +277,7 @@ class AgentService:
                 )
 
             # If loop limit reached
+            self._record_turn(_u, user_message, "Completed maximum tool execution turns.")
             return AgentResponse(
                 message="Completed maximum tool execution turns.",
                 tools_executed=executed_tools,

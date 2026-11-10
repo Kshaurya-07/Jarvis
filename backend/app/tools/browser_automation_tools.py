@@ -9,6 +9,7 @@ from app.core.browser_automation import (
     DomainSecurityViolation,
 )
 from app.core.confirmation import confirmation_manager
+from app.core.user_context import get_current_user
 from app.tools.base import ToolResult
 from app.tools.memory_tools import detect_sensitive_data
 
@@ -41,11 +42,13 @@ def browser_navigate(
         return ToolResult(success=False, error=str(e))
 
     # 3. Check confirmation
+    _u = get_current_user()
     if not confirmation_id:
         pending = confirmation_manager.create_pending_action(
             tool_name="browser_navigate",
             arguments={"url": clean_url, "approved_domain": approved_domain},
             description=f"Navigate browser to '{clean_url}' within approved domain '{approved_domain}'",
+            user=_u,
         )
         return ToolResult(
             success=False,
@@ -66,6 +69,7 @@ def browser_navigate(
         confirmation_id=confirmation_id,
         tool_name="browser_navigate",
         arguments={"url": clean_url, "approved_domain": approved_domain},
+        user=_u,
     )
     if not is_valid:
         return ToolResult(
@@ -193,6 +197,7 @@ def browser_fill_field(
                 "approved_domain": approved_domain,
             },
             description=f"Fill field '{clean_desc}' on approved domain '{approved_domain}'. (Manual submit required)",
+            user=get_current_user(),
         )
         return ToolResult(
             success=False,
@@ -218,6 +223,7 @@ def browser_fill_field(
             "value": value,
             "approved_domain": approved_domain,
         },
+        user=get_current_user(),
     )
     if not is_valid:
         return ToolResult(

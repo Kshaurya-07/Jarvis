@@ -127,7 +127,7 @@ class MemoryStorage:
 memory_storage = MemoryStorage()
 
 
-def remember_item(key: str, content: str) -> ToolResult:
+def remember_item(key: str, content: str, user=None) -> ToolResult:
     """
     Store an explicitly requested piece of information in local persistent memory.
     
@@ -158,19 +158,23 @@ def remember_item(key: str, content: str) -> ToolResult:
         )
 
     try:
-        item = memory_storage.put(key=key, content=content)
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        item = get_user_store().put_memory(u, key=key, content=content)
         return ToolResult(
             success=True,
             output={
-                "message": f"Remembered '{item.key}'.",
-                "memory": item.model_dump(),
+                "message": f"Remembered '{item['key']}'.",
+                "memory": item,
             },
         )
     except Exception as e:
         return ToolResult(success=False, error=f"Failed to save memory: {str(e)}")
 
 
-def forget_item(key: str) -> ToolResult:
+def forget_item(key: str, user=None) -> ToolResult:
     """
     Delete an item from persistent local memory.
     
@@ -182,7 +186,11 @@ def forget_item(key: str) -> ToolResult:
 
     clean_key = key.strip().lower()
     try:
-        deleted = memory_storage.delete(clean_key)
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        deleted = get_user_store().delete_memory(u, clean_key)
         if not deleted:
             return ToolResult(
                 success=False,
@@ -196,7 +204,7 @@ def forget_item(key: str) -> ToolResult:
         return ToolResult(success=False, error=f"Failed to delete memory: {str(e)}")
 
 
-def list_memories() -> ToolResult:
+def list_memories(user=None) -> ToolResult:
     """
     List all saved user-approved memory items.
     """
@@ -212,13 +220,17 @@ def list_memories() -> ToolResult:
         )
 
     try:
-        items = memory_storage.list_all()
+        from app.core.store import get_user_store
+        from app.core.user_context import get_current_user, resolve_user
+
+        u = resolve_user(user or get_current_user())
+        items = get_user_store().list_memories(u)
         return ToolResult(
             success=True,
             output={
                 "enabled": True,
                 "count": len(items),
-                "memories": [item.model_dump() for item in items],
+                "memories": items,
             },
         )
     except Exception as e:

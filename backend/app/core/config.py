@@ -32,7 +32,50 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ALLOW_REMOTE_ACCESS: bool = False  # Strictly local-only by default
 
+    # --- Cloud-first mode (Phase 12) -------------------------------------
+    # CLOUD_MODE=true is the default on Render (see render.yaml): the backend
+    # listens on 0.0.0.0, Google sign-in is mandatory for every AI/data
+    # endpoint, and all user data is namespaced per Google account. Local
+    # mode (CLOUD_MODE=false, the default) keeps the old behaviour: loopback
+    # requests from the owner's own laptop are trusted without sign-in, so
+    # local development and the existing test suite keep working.
+    CLOUD_MODE: bool = False
+    # Secret used to sign Jarvis session JWTs (HS256) and, as a fallback, to
+    # derive the BYOK encryption key. REQUIRED in cloud mode; generate a
+    # long random value (Render generates one via generateValue). Never
+    # commit it, never log it. Rotating it signs everyone out and makes
+    # previously stored BYOK keys undecryptable (users re-enter their key).
+    SESSION_SECRET: Optional[str] = None
+    SESSION_TIMEOUT_SECONDS: int = 86400  # 24 hours per sign-in session
+    # Optional dedicated Fernet key (base64 urlsafe 32 bytes) for encrypting
+    # stored BYOK Gemini keys. If unset, one is derived from SESSION_SECRET.
+    KEY_ENCRYPTION_KEY: Optional[str] = None
+    # Google sign-in (login) flow. Separate purpose from the read-only
+    # Gmail/Calendar OAuth below: scopes are only openid/email/profile.
+    GOOGLE_LOGIN_REDIRECT_URI: str = "http://127.0.0.1:8000/api/auth/login/callback"
+    GOOGLE_LOGIN_SCOPES: list[str] = ["openid", "email", "profile"]
+    # Public frontend origin users are sent back to after Google sign-in.
+    FRONTEND_URL: str = "https://jarvis-kumar-shaurya.vercel.app"
+    # Per-user Gemini usage caps (BYOK keys are the user's own, so these are
+    # abuse/fat-finger guards, not billing controls). In-memory only: they
+    # reset on restart/redeploy and do not sync across instances.
+    GEMINI_CALLS_PER_USER_PER_HOUR: int = 30
+    GEMINI_CALLS_PER_USER_PER_DAY: int = 100
+
+    # --- External storage (Vercel serverless) ---------------------------
+    # DATABASE_URL: Postgres connection string (Neon — see README).
+    # REQUIRED in production on Vercel: serverless functions have no
+    # persistent filesystem, so all per-user data (notes, memories,
+    # reminders, encrypted BYOK keys, chat history, action log) lives in
+    # Postgres. When unset, Jarvis uses local per-user files instead, so
+    # local `uvicorn` dev and tests work with zero setup.
+    DATABASE_URL: Optional[str] = None
+
     # Gemini API settings
+    # NOTE (Phase 12, BYOK): GEMINI_API_KEY is NO LONGER USED. Every user
+    # brings their own Gemini key, stored encrypted per user. A server/owner
+    # key is deliberately not a fallback: one shared key would let any
+    # signed-in user spend the owner's quota. Leave this unset.
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
@@ -116,12 +159,35 @@ class Settings(BaseSettings):
 
         # 1. Localhost binding security check
         loopback_hosts = {"127.0.0.1", "localhost", "::1"}
-        if self.HOST not in loopback_hosts and not self.ALLOW_REMOTE_ACCESS:
+        if self.HOST not in loopback_hosts and not self.ALLOW_REMOTE_ACCESS and not self.CLOUD_MODE:
             raise ConfigurationError(
                 f"Security Violation: Backend is configured to bind to '{self.HOST}'. "
                 "Jarvis must bind strictly to 127.0.0.1 (localhost) by default to prevent "
                 "unauthorized network access. Set ALLOW_REMOTE_ACCESS=true to explicitly override."
             )
+
+        # 1b. Cloud mode: 0.0.0.0 is expected (Render), but sign-in must be
+        # possible — a missing/short SESSION_SECRET is a loud warning, not a
+        # fatal error, so local smoke tests can still boot without one.
+        if self.CLOUD_MODE:
+            if not self.SESSION_SECRET or len(self.SESSION_SECRET) < 32:
+                warnings.append(
+                    "Warning: CLOUD_MODE is on but SESSION_SECRET is missing or shorter "
+                    "than 32 characters. Google sign-in sessions cannot be issued until "
+                    "a long random SESSION_SECRET is set."
+                )
+            if not self.DATABASE_URL:
+                warnings.append(
+                    "Warning: CLOUD_MODE is on but DATABASE_URL is not set. User data "
+                    "will be written to the local filesystem, which DOES NOT PERSIST on "
+                    "Vercel serverless — set DATABASE_URL (Neon Postgres) before "
+                    "deploying, or data will be lost between invocations."
+                )
+            if self.HOST in loopback_hosts:
+                warnings.append(
+                    "Warning: CLOUD_MODE is on but HOST is still a loopback address; "
+                    "on Render HOST must be 0.0.0.0 or the service will not be reachable."
+                )
 
         # 2. Port validation
         if not (1 <= self.PORT <= 65535):
@@ -136,10 +202,11 @@ class Settings(BaseSettings):
             )
 
         # 4. Informational checks
-        if not self.GEMINI_API_KEY or self.GEMINI_API_KEY.strip() in ("", "your_gemini_api_key_here"):
+        if self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip() not in ("", "your_gemini_api_key_here"):
             warnings.append(
-                "Notice: GEMINI_API_KEY is not configured. AI reasoning, chat, and Gemini tool selection "
-                "will be offline until an API key is provided in .env."
+                "Notice: GEMINI_API_KEY is set but is IGNORED since Phase 12 (BYOK). "
+                "Each user brings their own Gemini key; there is no server/owner key "
+                "path. Remove it from your environment to avoid confusion."
             )
 
         if self.GOOGLE_CLIENT_ID and not self.GOOGLE_CLIENT_SECRET:

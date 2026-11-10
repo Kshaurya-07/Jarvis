@@ -174,7 +174,7 @@ def test_remote_origin_requires_session_token(client: TestClient, monkeypatch):
         headers={"Origin": PROD_ORIGIN}
     )
     assert unauth_resp.status_code == 401
-    assert "Remote authentication required" in unauth_resp.json()["detail"]
+    assert "Sign-in required" in unauth_resp.json()["detail"]
 
     # 2. Calling with invalid token -> 401
     bad_token_resp = client.post(
@@ -194,7 +194,7 @@ def test_remote_origin_requires_session_token(client: TestClient, monkeypatch):
 
     # Mock agent reply to test end-to-end
     from app.services.agent_service import AgentResponse
-    async def mock_chat(msg):
+    async def mock_chat(msg, **kwargs):
         return AgentResponse(success=True, message=f"Echo: {msg}", tools_executed=[])
     monkeypatch.setattr("app.services.agent_service.agent_service.chat", mock_chat)
 
@@ -269,7 +269,7 @@ def test_remote_origin_requires_session_token_for_data_endpoints(client: TestCli
             kwargs["json"] = {"domain": "example.com"}
         resp = client.request(method, url, **kwargs)
         assert resp.status_code == 401, f"{method} {url} returned {resp.status_code}, expected 401"
-        assert "Remote authentication required" in resp.json()["detail"]
+        assert "Sign-in required" in resp.json()["detail"]
 
     # With a valid session token the same endpoints succeed (memories: 200, empty list)
     code = remote_session_manager.generate_pairing_code()

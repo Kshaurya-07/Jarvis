@@ -421,3 +421,18 @@ class RemoteStopResponse(BaseModel):
 
 
 
+
+
+# --- Phase 12 Schemas (Google sign-in, BYOK key) ---
+
+class ApiKeyRequest(BaseModel):
+    """Payload carrying the user's own Gemini API key (BYOK)."""
+    api_key: str = Field(..., min_length=10, max_length=200, description="The user's own Gemini API key from Google AI Studio.")
+
+
+class KeyStatusResponse(BaseModel):
+    """Public status of the user's saved Gemini key. Never contains the key."""
+    has_key: bool
+    hint: Optional[str] = None
+    created_at: Optional[str] = None
+    valid: Optional[bool] = None

@@ -56,11 +56,17 @@ class ToolRegistry:
         """Return function declarations formatted for the Gemini API."""
         return [tool.get_gemini_declaration() for tool in self._tools.values()]
 
-    def execute_tool(self, name: str, arguments: Dict[str, Any]) -> ToolResult:
+    def execute_tool(self, name: str, arguments: Dict[str, Any], user=None) -> ToolResult:
         """
         Safely execute a tool with server-side validation and audit logging.
-        Never trusts model-generated arguments blindly.
+        Never trusts model-generated arguments blindly. Tools run as ``user``
+        (defaults to the current request's user), so they only touch that
+        user's data.
         """
+        from app.core.user_context import get_current_user, resolve_user, set_current_user
+
+        _u = resolve_user(user or get_current_user())
+        set_current_user(_u)
         start_time = time.perf_counter()
 
         if name not in self._tools:
@@ -71,6 +77,7 @@ class ToolRegistry:
                 status="failure",
                 details=err_msg,
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return ToolResult(success=False, error=err_msg)
 
@@ -82,6 +89,7 @@ class ToolRegistry:
                 status="failure",
                 details=err_msg,
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return ToolResult(success=False, error=err_msg)
 
@@ -98,6 +106,7 @@ class ToolRegistry:
                 status="success" if result.success else "failure",
                 details=f"success={result.success} | error={result.error or 'none'}",
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return result
         except Exception as e:
@@ -108,6 +117,7 @@ class ToolRegistry:
                 status="failure",
                 details=err_msg,
                 execution_time_ms=elapsed_ms,
+                user=_u,
             )
             return ToolResult(success=False, error=err_msg)
 

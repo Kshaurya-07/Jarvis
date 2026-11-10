@@ -1,3 +1,14 @@
+"""User data controls (Phase 12): export, wipe, backups — all per-user.
+
+* Export / wipe work in both backends through the active UserStore.
+* File backups (checksum-verified JSON snapshots in ``backups/``) are a
+  **local-mode-only** feature: on Vercel the data already lives in
+  Postgres (which has its own backups — see README), so
+  create/list/restore raise a clear error in Postgres mode instead of
+  pretending a file snapshot exists.
+* In cloud mode ``get_data_locations`` never returns absolute server
+  filesystem paths — only scoped, relative labels.
+"""
 import datetime
 import hashlib
 import json
@@ -8,8 +19,10 @@ from app import __version__
 from app.core.config import settings
 from app.core.logger import app_logger
 from app.core.security import sanitize_filename, resolve_safe_path
-from app.tools.memory_tools import memory_storage, MemoryItem
-from app.tools.reminders_tools import reminders_storage, Reminder
+from app.core.store import get_user_store, uses_postgres
+from app.core.user_context import UserIdentity, get_current_user, resolve_user, user_paths
+from app.tools.memory_tools import MemoryItem
+from app.tools.reminders_tools import Reminder
 
 
 class UserDataManager:
@@ -18,53 +31,50 @@ class UserDataManager:
     and opt-in local backup and recovery workflows.
     """
 
-    def get_data_locations(self) -> Dict[str, Any]:
-        """Return all local filesystem paths where user data is stored."""
-        notes_count = len(list(settings.NOTES_DIR.glob("*.md"))) if settings.NOTES_DIR.exists() else 0
-        screenshots_count = len(list(settings.SCREENSHOTS_DIR.glob("*.png"))) if settings.SCREENSHOTS_DIR.exists() else 0
-        reminders_count = len(reminders_storage.list_all(include_completed=True))
-        memories_count = len(memory_storage.list_all())
-        backups_count = len(list(settings.BACKUPS_DIR.glob("*.json"))) if settings.BACKUPS_DIR.exists() else 0
+    def _u(self, user=None) -> UserIdentity:
+        return resolve_user(user or get_current_user())
 
-        # OAuth token storage status
+    def get_data_locations(self, user=None) -> Dict[str, Any]:
+        """Return storage locations for the caller's own data."""
+        u = self._u(user)
+        store = get_user_store()
+        paths = user_paths(u)
+        notes = store.list_notes(u)
+        reminders = store.list_reminders(u, include_completed=True)
+        memories = store.list_memories(u)
+        if uses_postgres():
+            label = lambda name: f"Postgres (Neon) — your account's {name}"
+            locs = {
+                "notes": {"path": label("notes"), "description": "Your notes, stored in Postgres.", "items_count": len(notes)},
+                "reminders": {"path": label("reminders"), "description": "Your reminders, stored in Postgres.", "items_count": len(reminders)},
+                "memories": {"path": label("memories"), "description": "Your memories, stored in Postgres.", "items_count": len(memories)},
+                "chat_history": {"path": label("chat history"), "description": "Your chat history, stored in Postgres.", "items_count": len(store.list_chat(u, limit=1000))},
+            }
+            return {
+                "locations": locs,
+                "oauth_storage": {"google": {"connected": False, "note": "Sign-in is per Google account; Gmail/Calendar read-only access is not available in cloud mode yet."}},
+                "disclosure": (
+                    "Your data lives in your own rows in Postgres (Neon), namespaced by your "
+                    "Google account. Nothing is shared with other users. Jarvis includes zero "
+                    "telemetry and zero background sync daemons."
+                ),
+            }
+
+        notes_count = len(notes)
+        screenshots_count = len(list(paths.screenshots_dir.glob("*.png"))) if paths.screenshots_dir.exists() else 0
+        backups_count = len(list(paths.backups_dir.glob("*.json"))) if paths.backups_dir.exists() else 0
         from app.core.google_auth import google_auth_manager
-        google_status = google_auth_manager.get_status()
 
+        google_status = google_auth_manager.get_status()
         return {
             "locations": {
-                "workspace_directory": {
-                    "path": str(settings.WORKSPACE_DIR),
-                    "description": "Configured sandboxed workspace folder for list_files and read_text_file.",
-                },
-                "notes_directory": {
-                    "path": str(settings.NOTES_DIR),
-                    "description": "Markdown notes directory created via create_note.",
-                    "items_count": notes_count,
-                },
-                "screenshots_directory": {
-                    "path": str(settings.SCREENSHOTS_DIR),
-                    "description": "Locally stored PNG screenshots captured via capture_screenshot.",
-                    "items_count": screenshots_count,
-                },
-                "reminders_file": {
-                    "path": str(settings.REMINDERS_FILE),
-                    "description": "Local JSON store for user reminders.",
-                    "items_count": reminders_count,
-                },
-                "memories_file": {
-                    "path": str(settings.MEMORIES_FILE),
-                    "description": "Local JSON store for user-approved explicit memories.",
-                    "items_count": memories_count,
-                },
-                "action_log_file": {
-                    "path": str(settings.ACTION_LOG_FILE),
-                    "description": "Local audit log of tool execution statuses (secrets scrubbed).",
-                },
-                "backups_directory": {
-                    "path": str(settings.BACKUPS_DIR),
-                    "description": "Opt-in local backup snapshots directory.",
-                    "items_count": backups_count,
-                },
+                "workspace_directory": {"path": str(paths.workspace_dir), "description": "Your sandboxed workspace folder.", "items_count": 0},
+                "notes_directory": {"path": str(paths.notes_dir), "description": "Your markdown notes.", "items_count": notes_count},
+                "screenshots_directory": {"path": str(paths.screenshots_dir), "description": "Your PNG screenshots.", "items_count": screenshots_count},
+                "reminders_file": {"path": str(paths.reminders_file), "description": "Your reminders.", "items_count": len(reminders)},
+                "memories_file": {"path": str(paths.memories_file), "description": "Your memories.", "items_count": len(memories)},
+                "action_log_file": {"path": str(paths.action_log_file), "description": "Your audit log (secrets scrubbed)."},
+                "backups_directory": {"path": str(paths.backups_dir), "description": "Your backup snapshots.", "items_count": backups_count},
             },
             "oauth_storage": {
                 "google": {
@@ -75,45 +85,26 @@ class UserDataManager:
                 }
             },
             "disclosure": (
-                "All user data is stored locally on this machine in the designated directories. "
+                "Your data is stored under your own account namespace. "
                 "Jarvis includes zero telemetry, zero background sync daemons, and zero automatic cloud backups."
             ),
         }
 
-    def export_user_data(self) -> Dict[str, Any]:
+    def export_user_data(self, user=None) -> Dict[str, Any]:
         """
-        Export user-owned notes, memories, and reminders in clean JSON format.
-        Strictly excludes API keys, credentials, and authentication tokens.
+        Export the caller's own notes, memories, and reminders in clean JSON.
+        Strictly excludes secrets, API keys, and credentials.
         """
-        # Read notes
-        notes: List[Dict[str, Any]] = []
-        if settings.NOTES_DIR.exists():
-            for note_path in sorted(settings.NOTES_DIR.glob("*.md")):
-                try:
-                    notes.append({
-                        "filename": note_path.name,
-                        "title": note_path.stem,
-                        "content": note_path.read_text(encoding="utf-8"),
-                        "modified_at": datetime.datetime.fromtimestamp(
-                            note_path.stat().st_mtime, tz=datetime.timezone.utc
-                        ).isoformat(),
-                    })
-                except Exception as e:
-                    app_logger.warning("Could not read note '%s' during export: %s", note_path.name, e)
-
-        # Read reminders & memories
-        reminders = [r.model_dump() for r in reminders_storage.list_all(include_completed=True)]
-        memories = [m.model_dump() for m in memory_storage.list_all()]
-
+        u = self._u(user)
+        store = get_user_store()
+        notes = store.list_notes(u)
+        reminders = store.list_reminders(u, include_completed=True)
+        memories = store.list_memories(u)
         return {
             "export_format_version": "1.0",
             "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "app_version": __version__,
-            "data": {
-                "notes": notes,
-                "reminders": reminders,
-                "memories": memories,
-            },
+            "data": {"notes": notes, "reminders": reminders, "memories": memories},
             "summary": {
                 "notes_count": len(notes),
                 "reminders_count": len(reminders),
@@ -122,57 +113,28 @@ class UserDataManager:
             "privacy_notice": "Secrets, credentials, and API keys are strictly excluded from user data exports.",
         }
 
-    def clear_all_local_data(self, confirm: bool, confirmation_text: str) -> Dict[str, Any]:
+    def clear_all_local_data(self, confirm: bool, confirmation_text: str, user=None) -> Dict[str, Any]:
         """
-        Permanently wipe user-owned notes, memories, reminders, and screenshot images.
-        Requires explicit confirmation and exact matching confirmation_text.
+        Permanently wipe the caller's own notes, memories, reminders, and
+        screenshots. Requires confirm=true and confirmation_text='DELETE ALL DATA'.
         """
+        u = self._u(user)
         if not confirm or confirmation_text.strip().upper() != "DELETE ALL DATA":
             raise ValueError(
-                "Confirmation required: To permanently clear all local data, you must pass "
+                "Confirmation required: To permanently clear all your data, you must pass "
                 "confirm=true and confirmation_text='DELETE ALL DATA'. "
-                "This action will permanently delete all user notes (*.md), local memories, reminders, "
-                "and local screenshot files. Sandboxed workspace files and Google OAuth tokens are preserved."
+                "This will permanently delete your notes, local memories, reminders, "
+                "and screenshot files. Your Gemini key and Google sign-in are preserved."
             )
-
-        deleted_notes = 0
-        if settings.NOTES_DIR.exists():
-            for note_path in list(settings.NOTES_DIR.glob("*.md")):
-                try:
-                    note_path.unlink()
-                    deleted_notes += 1
-                except Exception as e:
-                    app_logger.warning("Failed to delete note '%s': %s", note_path, e)
-
-        deleted_screenshots = 0
-        if settings.SCREENSHOTS_DIR.exists():
-            for shot_path in list(settings.SCREENSHOTS_DIR.glob("*.png")):
-                try:
-                    shot_path.unlink()
-                    deleted_screenshots += 1
-                except Exception as e:
-                    app_logger.warning("Failed to delete screenshot '%s': %s", shot_path, e)
-
-        # Clear reminders
-        deleted_reminders = len(reminders_storage.list_all(include_completed=True))
-        if settings.REMINDERS_FILE.exists():
-            try:
-                settings.REMINDERS_FILE.unlink()
-            except Exception:
-                pass
-
-        # Clear memories
-        deleted_memories = len(memory_storage.list_all())
-        memory_storage.clear()
-
+        deleted = get_user_store().clear_all_user_data(u)
         return {
             "status": "cleared",
-            "message": "User data successfully cleared.",
+            "message": "Your data was successfully cleared.",
             "deleted_items": {
-                "notes": deleted_notes,
-                "reminders": deleted_reminders,
-                "memories": deleted_memories,
-                "screenshots": deleted_screenshots,
+                "notes": deleted.get("notes", 0),
+                "reminders": deleted.get("reminders", 0),
+                "memories": deleted.get("memories", 0),
+                "screenshots": deleted.get("screenshots", 0),
             },
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
@@ -182,13 +144,20 @@ class UserDataManager:
         canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
-    def create_backup(self, backup_name: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Create a validated local backup snapshot of user notes, reminders, and memories.
-        Saves snapshot to backups/ directory with SHA-256 checksum integrity verification.
-        Does NOT include secrets, tokens, or credentials.
-        """
-        export = self.export_user_data()
+    def _require_file_backups(self) -> None:
+        if uses_postgres():
+            raise ValueError(
+                "File backups are not available in cloud mode: your data already lives in "
+                "Postgres (Neon), which provides its own backups. Use Export to download "
+                "a copy of your data instead."
+            )
+
+    def create_backup(self, backup_name: Optional[str] = None, user=None) -> Dict[str, Any]:
+        """Create a validated local backup snapshot (local mode only)."""
+        self._require_file_backups()
+        u = self._u(user)
+        paths = user_paths(u)
+        export = self.export_user_data(u)
         data_payload = export["data"]
         checksum = self._compute_checksum(data_payload)
 
@@ -199,8 +168,8 @@ class UserDataManager:
         else:
             filename = f"jarvis_backup_{timestamp_str}.json"
 
-        settings.BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-        backup_file = settings.BACKUPS_DIR / filename
+        paths.backups_dir.mkdir(parents=True, exist_ok=True)
+        backup_file = paths.backups_dir / filename
 
         backup_content = {
             "jarvis_backup_version": "1.0",
@@ -289,13 +258,19 @@ class UserDataManager:
         self,
         backup_filename: str,
         confirm_overwrite: bool = False,
+        user=None,
     ) -> Dict[str, Any]:
         """
-        Safely restores a backup snapshot after checksum validation.
-        Requires explicit confirmation before overwriting existing data.
+        Safely restore the caller's data from a local backup file after
+        checksum validation (local mode only).
+        Requires confirm_overwrite=true if existing data is present.
         """
+        self._require_file_backups()
+        u = self._u(user)
+        paths = user_paths(u)
+        store = get_user_store()
         # Resolve path safely inside backups directory
-        backup_path = resolve_safe_path(settings.BACKUPS_DIR, backup_filename, must_exist=True)
+        backup_path = resolve_safe_path(paths.backups_dir, backup_filename, must_exist=True)
 
         try:
             with open(backup_path, "r", encoding="utf-8") as f:
@@ -308,9 +283,9 @@ class UserDataManager:
         data = validated["data"]
 
         # Check existing data
-        has_existing_notes = bool(list(settings.NOTES_DIR.glob("*.md"))) if settings.NOTES_DIR.exists() else False
-        has_existing_reminders = bool(reminders_storage.list_all(include_completed=True))
-        has_existing_memories = bool(memory_storage.list_all())
+        has_existing_notes = bool(store.list_notes(u))
+        has_existing_reminders = bool(store.list_reminders(u, include_completed=True))
+        has_existing_memories = bool(store.list_memories(u))
 
         if (has_existing_notes or has_existing_reminders or has_existing_memories) and not confirm_overwrite:
             raise ValueError(
@@ -320,27 +295,25 @@ class UserDataManager:
             )
 
         # Restore notes
-        settings.NOTES_DIR.mkdir(parents=True, exist_ok=True)
         restored_notes = 0
         for note in data.get("notes", []):
             safe_fname = sanitize_filename(Path(note["filename"]).stem) + ".md"
-            target_file = settings.NOTES_DIR / safe_fname
+            target_file = paths.notes_dir / safe_fname
+            target_file.parent.mkdir(parents=True, exist_ok=True)
             target_file.write_text(note["content"], encoding="utf-8")
             restored_notes += 1
 
         # Restore reminders
-        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         reminders_list = [Reminder(**r) for r in data.get("reminders", [])]
-        raw_reminders = [r.model_dump() for r in reminders_list]
-        with open(settings.REMINDERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(raw_reminders, f, indent=2, ensure_ascii=False)
+        for r in reminders_list:
+            store.add_reminder(u, title=r.title, due_time=r.due_time, notes=r.notes)
 
         # Restore memories
-        memory_storage.clear()
+        store.clear_memories(u)
         restored_memories = 0
         for m in data.get("memories", []):
             item = MemoryItem(**m)
-            memory_storage.put(item.key, item.content)
+            store.put_memory(u, item.key, item.content)
             restored_memories += 1
 
         return {
@@ -354,13 +327,16 @@ class UserDataManager:
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
 
-    def list_backups(self) -> List[Dict[str, Any]]:
-        """List all local backups with metadata."""
-        if not settings.BACKUPS_DIR.exists():
+    def list_backups(self, user=None) -> List[Dict[str, Any]]:
+        """List the caller's local backups with metadata (local mode only)."""
+        self._require_file_backups()
+        u = self._u(user)
+        paths = user_paths(u)
+        if not paths.backups_dir.exists():
             return []
 
         results: List[Dict[str, Any]] = []
-        for b_file in sorted(settings.BACKUPS_DIR.glob("*.json"), reverse=True):
+        for b_file in sorted(paths.backups_dir.glob("*.json"), reverse=True):
             info = {
                 "filename": b_file.name,
                 "size_bytes": b_file.stat().st_size,

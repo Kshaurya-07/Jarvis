@@ -12,7 +12,7 @@ from app.core.security import (
 from app.tools.base import ToolResult
 
 
-def list_files(subfolder: str = "") -> ToolResult:
+def list_files(subfolder: str = "", user=None) -> ToolResult:
     """
     List files and directories inside the explicitly configured workspace folder.
     
@@ -23,7 +23,9 @@ def list_files(subfolder: str = "") -> ToolResult:
         if not isinstance(subfolder, str):
             subfolder = str(subfolder)
 
-        workspace_dir = settings.WORKSPACE_DIR
+        from app.core.user_context import get_current_user, resolve_user, user_paths
+
+        workspace_dir = user_paths(resolve_user(user or get_current_user())).workspace_dir
         target_dir = resolve_safe_path(
             base_dir=workspace_dir,
             user_path=subfolder,
@@ -67,7 +69,7 @@ def list_files(subfolder: str = "") -> ToolResult:
         return ToolResult(success=False, error=f"Failed to list files: {str(e)}")
 
 
-def read_text_file(filename: str) -> ToolResult:
+def read_text_file(filename: str, user=None) -> ToolResult:
     """
     Read the contents of a text file inside the explicitly configured workspace folder.
     
@@ -81,7 +83,9 @@ def read_text_file(filename: str) -> ToolResult:
                 error="Filename parameter is required and must be a non-empty string.",
             )
 
-        workspace_dir = settings.WORKSPACE_DIR
+        from app.core.user_context import get_current_user, resolve_user, user_paths
+
+        workspace_dir = user_paths(resolve_user(user or get_current_user())).workspace_dir
         safe_path = resolve_safe_path(
             base_dir=workspace_dir,
             user_path=filename,

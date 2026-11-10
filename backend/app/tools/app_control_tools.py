@@ -1,6 +1,7 @@
 import subprocess
 from typing import Dict, Optional
 
+from app.core.config import settings
 from app.core.confirmation import confirmation_manager
 from app.core.security import verify_windows_os, UnsupportedPlatformError
 from app.tools.base import ToolResult
@@ -35,7 +36,7 @@ ALLOWED_APPLICATIONS: Dict[str, Dict[str, str]] = {
 }
 
 
-def open_application(app_name: str, confirmation_id: Optional[str] = None) -> ToolResult:
+def open_application(app_name: str, confirmation_id: Optional[str] = None, user=None) -> ToolResult:
     """
     Open an application from the server-side allowlist on Windows.
     Requires an explicit user confirmation step before launching.
@@ -44,6 +45,15 @@ def open_application(app_name: str, confirmation_id: Optional[str] = None) -> To
         app_name: The key of the allowed application (e.g. 'notepad', 'calculator', 'paint', 'explorer', 'cmd').
         confirmation_id: Optional confirmation token if confirmation was already granted.
     """
+    from app.core.user_context import get_current_user, resolve_user
+
+    _u = resolve_user(user or get_current_user())
+    if settings.CLOUD_MODE:
+        return ToolResult(
+            success=False,
+            error="Opening apps is a local-only feature: there is no laptop to open apps on "
+            "in cloud mode. Not available in cloud mode.",
+        )
     try:
         verify_windows_os("open_application")
     except UnsupportedPlatformError as e:
@@ -76,6 +86,7 @@ def open_application(app_name: str, confirmation_id: Optional[str] = None) -> To
             confirmation_id=confirmation_id.strip(),
             tool_name="open_application",
             arguments=action_args,
+            user=_u,
         )
         if not is_valid:
             return ToolResult(
@@ -91,6 +102,7 @@ def open_application(app_name: str, confirmation_id: Optional[str] = None) -> To
             tool_name="open_application",
             arguments=action_args,
             description=f"Launch application '{app_config['display_name']}' ({app_config['executable']})",
+            user=_u,
         )
         return ToolResult(
             success=False,
