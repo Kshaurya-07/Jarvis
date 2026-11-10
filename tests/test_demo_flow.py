@@ -1,11 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 from starlette.testclient import TestClient
 
 from app.core.config import settings
-from app.core.demo_manager import demo_manager
 from app.services.agent_service import AgentResponse, ToolExecutionRecord
-from app.tools.notes_tools import create_note, search_notes
+from app.tools.notes_tools import create_note
 from app.tools.reminders_tools import reminders_storage
 from app.tools.memory_tools import memory_storage
 
@@ -69,7 +67,7 @@ def test_demo_seed_and_reset_lifecycle_isolates_user_data(client: TestClient):
     real_note_path = settings.NOTES_DIR / "personal_work_plan.md"
     assert real_note_path.exists()
 
-    user_rem = reminders_storage.add(title="Buy anniversary gift", due_time="Tomorrow 5 PM")
+    reminders_storage.add(title="Buy anniversary gift", due_time="Tomorrow 5 PM")
     memory_storage.put("user_favorite_editor", "VS Code")
 
     # 2. Seed demo data
