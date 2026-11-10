@@ -1,9 +1,6 @@
-from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
+from unittest.mock import MagicMock, patch
 
-from app.core.config import settings
 from app.core.logger import action_logger
-from app.services.extension_service import extension_service
 from app.tools.registry import tool_registry
 
 
