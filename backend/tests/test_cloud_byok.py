@@ -509,6 +509,23 @@ def test_vercel_entrypoint_and_config():
     assert "backend/app/" not in ignored
 
 
+def test_default_gemini_model_is_3_8_flash(monkeypatch):
+    """Default model must be gemini-3.8-flash: Google retired gemini-2.5-flash
+    for new users (live: chat failed with API 404 'model ... is no longer
+    available to new users'). No stale 2.5-flash default may remain in the
+    config default, .env.example, or README docs."""
+    from pathlib import Path
+
+    from app.core.config import Settings
+
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    assert Settings().GEMINI_MODEL == "gemini-3.8-flash"
+    repo_root = Path(__file__).resolve().parents[2]
+    for rel in ("backend/app/core/config.py", ".env.example", "README.md"):
+        assert "gemini-2.5-flash" not in (repo_root / rel).read_text()
+    assert "gemini-3.8-flash" in (repo_root / ".env.example").read_text()
+
+
 class _FakeCursor:
     """Minimal in-memory stand-in for a psycopg cursor (memories + users)."""
 

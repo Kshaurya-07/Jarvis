@@ -77,7 +77,9 @@ class Settings(BaseSettings):
     # key is deliberately not a fallback: one shared key would let any
     # signed-in user spend the owner's quota. Leave this unset.
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # gemini-3.8-flash is the current default: Google retired the previous
+    # 2.5 default for new users (API 404 "model is no longer available").
+    GEMINI_MODEL: str = "gemini-3.8-flash"
 
     # Storage paths
     WORKSPACE_DIR: Path = Path("./workspace")

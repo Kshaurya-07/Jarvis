@@ -37,7 +37,7 @@ to share passwords or API keys in chat.
 - **Cloud-first** — sign in with Google, bring your own Gemini key, and
   everything syncs. No laptop, no localhost, no install. Local dev still
   works with zero setup (see "Local development" below).
-- **Chat with tool calling** — Gemini (default `gemini-2.5-flash`, called
+- **Chat with tool calling** — Gemini (default `gemini-3.8-flash`, called
   with *your* key) calls tools over up to 5 turns. If you have not saved
   a key yet, chat tells you plainly how to add one instead of failing
   cryptically.
@@ -282,7 +282,7 @@ gitignored. All settings have defaults in `backend/app/core/config.py`.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | — | **IGNORED since Phase 12 (BYOK).** Each user brings their own key in the app; there is no server key. Do not set it. |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model used for chat and tool calling. |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini model used for chat and tool calling. |
 | `CLOUD_MODE` | `false` | `true` on Vercel: sign-in mandatory, storage is Postgres, host is the Vercel domain. Local dev leaves it `false`. |
 | `DATABASE_URL` | — | **Required in production.** Neon Postgres connection string. Unset = local per-user files. |
 | `SESSION_SECRET` | — | **Required in cloud mode.** Long random secret (32+ chars) signing session JWTs; also the fallback BYOK encryption-key source. |
