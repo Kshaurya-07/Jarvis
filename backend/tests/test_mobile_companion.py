@@ -181,3 +181,16 @@ def test_mobile_chat_api_interaction(client):
         assert data["tools_executed"][0]["tool_name"] == "list_files"
 
         assert data["tools_executed"][0]["tool_name"] == "list_files"
+
+
+def test_companion_chat_shows_friendly_message_on_504():
+    """A Vercel gateway timeout (HTTP 504) on chat must show the friendly
+    message in the Companion, never a raw 'Server returned HTTP 504'
+    (live bug, 2026-11-11: a slow chat showed the raw 504 in chat)."""
+    from pathlib import Path
+
+    app_js = (Path(__file__).resolve().parents[2] / "frontend" / "mobile" / "app.js").read_text()
+    assert "That took too long — please try again." in app_js
+    assert "response.status === 504" in app_js
+    # A fetch that never gets a response maps to the same friendly message.
+    assert 'err.name === "TypeError"' in app_js

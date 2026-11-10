@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from google.genai import types
 
 from app.core.config import settings
+from app.core.gemini_errors import classify_gemini_error, generate_content_with_retry
 from app.core.logger import action_logger, app_logger
 from app.services.agent_service import agent_service
 
@@ -149,10 +150,12 @@ Webpage URL: {url}
                 temperature=0.2,  # Low temperature for factual grounding
             )
 
-            response = client.models.generate_content(
+            response = await generate_content_with_retry(
+                client,
                 model=settings.GEMINI_MODEL,
                 contents=[types.Content(parts=[types.Part.from_text(text=prompt_content)])],
                 config=config,
+                fallback_model=settings.GEMINI_FALLBACK_MODEL,
             )
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -177,22 +180,26 @@ Webpage URL: {url}
             )
 
         except Exception as e:
+            # Friendly message for the UI; full detail stays in server logs.
+            error_code, friendly_message = classify_gemini_error(e)
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            app_logger.error("Extension page analysis failed: %s", str(e), exc_info=True)
+            app_logger.error(
+                "Extension page analysis failed [%s]: %s", error_code, str(e), exc_info=True
+            )
             action_logger.record_action(
                 tool_name="extension_read_page",
                 status="failure",
-                details=f"mode={mode} | domain={domain} | error={str(e)[:100]}",
+                details=f"mode={mode} | domain={domain} | error={error_code}",
                 execution_time_ms=elapsed_ms,
                 user=_u,
             )
             return PageAnalysisResult(
-                reply=f"Encountered an error while analyzing page text: {str(e)}",
+                reply=friendly_message,
                 mode=mode,
                 disclosure=disclosure_text,
                 chars_processed=len(page_text),
                 success=False,
-                error=str(e),
+                error=error_code,
             )
 
 

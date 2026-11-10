@@ -4,10 +4,14 @@ Cloud-mode tests build their own TestClient after flipping
 ``settings.CLOUD_MODE`` on (the shared ``client`` fixture runs in local
 mode, where loopback requests are the trusted local owner).
 """
+import asyncio
+import time
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
+from google.genai import errors as genai_errors
 from starlette.testclient import TestClient
 
 from app.core.config import settings
@@ -605,3 +609,247 @@ def test_postgres_store_scopes_memories_per_user(monkeypatch):
         store.put_memory(USER_B, "fav_food", "pizza")
         assert [m["content"] for m in store.list_memories(USER_B)] == ["pizza"]
         assert [m["content"] for m in store.list_memories(USER_A)] == ["biryani"]
+
+
+# ---------------------------------------------------------------------------
+# Friendly Gemini errors, one retry on 503, fast path, 10s budget
+# (live bugs, 2026-11-11: a 503 dumped raw API JSON into chat, and a slow
+# chat hit Vercel's 10s limit as a raw HTTP 504).
+# ---------------------------------------------------------------------------
+
+_OVERLOADED_JSON = {
+    "error": {
+        "code": 503,
+        "message": "This model is currently experiencing high demand. Spikes in demand "
+        "are usually temporary. Please try again later.",
+        "status": "UNAVAILABLE",
+    }
+}
+
+
+def _scripted_gemini_client(script, captured):
+    """Fake Gemini client whose generate_content follows a script: each
+    entry is either a SimpleNamespace response or an exception to raise."""
+
+    class FakeModels:
+        def __init__(self):
+            self._i = 0
+
+        def generate_content(self, **kwargs):
+            captured.setdefault("calls", []).append(kwargs)
+            outcome = script[min(self._i, len(script) - 1)]
+            self._i += 1
+            if isinstance(outcome, BaseException):
+                raise outcome
+            return outcome
+
+    class FakeClient:
+        def __init__(self, api_key):
+            self.models = FakeModels()
+
+    return FakeClient
+
+
+def _ok_response(text="Hi there!"):
+    return SimpleNamespace(function_calls=None, text=text, candidates=None)
+
+
+def _chat_with_scripted_gemini(monkeypatch, message, script, captured):
+    """POST /api/chat as USER_A with a saved key and a scripted Gemini."""
+    with cloud_client(monkeypatch) as client:
+        client.post("/api/auth/key", json={"api_key": TEST_KEY_A}, headers=auth_headers(USER_A))
+        with patch(
+            "app.services.agent_service.AgentService._get_client",
+            side_effect=lambda api_key=None: _scripted_gemini_client(script, captured)(api_key),
+        ):
+            return client.post("/api/chat", json={"message": message}, headers=auth_headers(USER_A))
+
+
+def test_classify_gemini_errors():
+    """Raw Gemini/SDK errors map to short codes + friendly English messages."""
+    from app.core.gemini_errors import classify_gemini_error
+
+    assert classify_gemini_error(genai_errors.ServerError(503, _OVERLOADED_JSON)) == (
+        "gemini_overloaded",
+        "Gemini is busy, please try again in a few minutes",
+    )
+    assert classify_gemini_error(
+        genai_errors.ClientError(
+            401, {"error": {"code": 401, "message": "API key not valid.", "status": "UNAUTHENTICATED"}}
+        )
+    ) == (
+        "gemini_invalid_key",
+        "Your Gemini key looks invalid or expired — please check it in Settings.",
+    )
+    assert classify_gemini_error(
+        genai_errors.ClientError(
+            404, {"error": {"code": 404, "message": "models/gemini-2.5-flash is no longer available.", "status": "NOT_FOUND"}}
+        )
+    ) == (
+        "gemini_model_unavailable",
+        "This Gemini model is not available — please tell the owner.",
+    )
+    assert classify_gemini_error(
+        genai_errors.ClientError(
+            429, {"error": {"code": 429, "message": "Quota exceeded.", "status": "RESOURCE_EXHAUSTED"}}
+        )
+    )[0] == "gemini_rate_limited"
+    assert classify_gemini_error(httpx.TimeoutException("timed out")) == (
+        "gemini_timeout",
+        "That took too long — please try again.",
+    )
+    code, message = classify_gemini_error(Exception("boom"))
+    assert code == "gemini_error"
+    assert message == "Something went wrong talking to Gemini — please try again."
+    assert "{'error'" not in message and "UNAVAILABLE" not in message
+
+
+def test_chat_gemini_503_retries_once_and_shows_friendly_message(monkeypatch):
+    """A 503 is retried exactly once, then the user sees the friendly busy
+    message — never the raw API error JSON (the live 2026-11-11 bug)."""
+    captured = {}
+    script = [
+        genai_errors.ServerError(503, _OVERLOADED_JSON),
+        genai_errors.ServerError(503, _OVERLOADED_JSON),
+    ]
+    with patch("app.core.gemini_errors.asyncio.sleep", new=AsyncMock()):
+        resp = _chat_with_scripted_gemini(monkeypatch, "hello", script, captured)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["success"] is False
+    assert data["reply"] == "Gemini is busy, please try again in a few minutes"
+    assert data["error"] == "gemini_overloaded"
+    assert "UNAVAILABLE" not in data["reply"]
+    assert "{'error'" not in data["reply"]
+    assert len(captured["calls"]) == 2  # initial attempt + exactly one retry
+
+
+def test_chat_gemini_503_succeeds_on_retry(monkeypatch):
+    """A 503 followed by a good reply on the retry returns the reply."""
+    captured = {}
+    script = [genai_errors.ServerError(503, _OVERLOADED_JSON), _ok_response("Hi there!")]
+    with patch("app.core.gemini_errors.asyncio.sleep", new=AsyncMock()):
+        resp = _chat_with_scripted_gemini(monkeypatch, "hello", script, captured)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    assert resp.json()["reply"] == "Hi there!"
+    assert len(captured["calls"]) == 2
+
+
+def test_chat_gemini_503_falls_back_when_configured(monkeypatch):
+    """With GEMINI_FALLBACK_MODEL set, a still-overloaded primary model is
+    tried once on the fallback (Google docs also list gemini-3.5-flash-lite)."""
+    monkeypatch.setattr(settings, "GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
+    captured = {}
+    script = [
+        genai_errors.ServerError(503, _OVERLOADED_JSON),
+        genai_errors.ServerError(503, _OVERLOADED_JSON),
+        _ok_response("Hi from the fallback!"),
+    ]
+    with patch("app.core.gemini_errors.asyncio.sleep", new=AsyncMock()):
+        resp = _chat_with_scripted_gemini(monkeypatch, "hello", script, captured)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    assert resp.json()["reply"] == "Hi from the fallback!"
+    assert len(captured["calls"]) == 3
+    assert captured["calls"][2]["model"] == "gemini-3.5-flash-lite"
+
+
+def test_chat_gemini_401_shows_key_message_no_retry(monkeypatch):
+    """A bad key is not retryable: one attempt, then the key message."""
+    captured = {}
+    script = [
+        genai_errors.ClientError(
+            401, {"error": {"code": 401, "message": "API key not valid.", "status": "UNAUTHENTICATED"}}
+        )
+    ]
+    resp = _chat_with_scripted_gemini(monkeypatch, "hello", script, captured)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is False
+    assert resp.json()["reply"] == "Your Gemini key looks invalid or expired — please check it in Settings."
+    assert resp.json()["error"] == "gemini_invalid_key"
+    assert len(captured["calls"]) == 1
+
+
+def test_chat_gemini_timeout_fails_fast_with_friendly_message(monkeypatch):
+    """A slow Gemini call fails fast with the timeout message — no hang,
+    no retry, no raw exception in chat."""
+    captured = {}
+    script = [httpx.TimeoutException("timed out")]
+    resp = _chat_with_scripted_gemini(monkeypatch, "hello", script, captured)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is False
+    assert resp.json()["reply"] == "That took too long — please try again."
+    assert resp.json()["error"] == "gemini_timeout"
+    assert len(captured["calls"]) == 1
+
+
+def test_retry_skipped_when_chat_budget_spent():
+    """The 503 retry is budget-aware: with no budget left the helper raises
+    without calling the model at all; with barely any budget it tries once
+    and does not retry."""
+    from app.core.gemini_errors import generate_content_with_retry
+
+    class FailingModels:
+        def __init__(self):
+            self.calls = 0
+
+        def generate_content(self, **kwargs):
+            self.calls += 1
+            raise genai_errors.ServerError(503, _OVERLOADED_JSON)
+
+    class FakeClient:
+        def __init__(self):
+            self.models = FailingModels()
+
+    client = FakeClient()
+    with pytest.raises(TimeoutError):
+        asyncio.run(
+            generate_content_with_retry(
+                client, model="gemini-3.8-flash", contents=[], config=None,
+                deadline=time.monotonic() - 1,
+            )
+        )
+    assert client.models.calls == 0
+
+    with pytest.raises(genai_errors.ServerError):
+        asyncio.run(
+            generate_content_with_retry(
+                client, model="gemini-3.8-flash", contents=[], config=None,
+                deadline=time.monotonic() + 3,
+            )
+        )
+    assert client.models.calls == 1  # one attempt, no retry, no 2s sleep
+
+
+def test_chat_simple_greeting_uses_fast_path_no_tools(monkeypatch):
+    """'hello' needs no tools: one direct call, no tool declarations."""
+    captured = {}
+    resp = _chat_with_scripted_gemini(monkeypatch, "hello", [_ok_response("Hello!")], captured)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    assert resp.json()["reply"] == "Hello!"
+    assert len(captured["calls"]) == 1
+    assert not captured["calls"][0]["config"].tools
+
+
+def test_chat_plain_question_uses_fast_path(monkeypatch):
+    """Plain Q&A with no tool intent also takes the fast path."""
+    captured = {}
+    resp = _chat_with_scripted_gemini(
+        monkeypatch, "What is the capital of France?", [_ok_response("Paris.")], captured
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["reply"] == "Paris."
+    assert not captured["calls"][0]["config"].tools
+
+
+def test_chat_tool_intent_uses_agent_loop(monkeypatch):
+    """A message about reminders engages the full tool-calling loop."""
+    captured = {}
+    resp = _chat_with_scripted_gemini(
+        monkeypatch, "List my reminders", [_ok_response("You have no reminders.")], captured
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["reply"] == "You have no reminders."
+    assert captured["calls"][0]["config"].tools  # tool declarations present

@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     # gemini-3.8-flash is the current default: Google retired the previous
     # 2.5 default for new users (API 404 "model is no longer available").
     GEMINI_MODEL: str = "gemini-3.8-flash"
+    # Optional fallback model, tried once when the primary model stays
+    # overloaded (503) after the single retry. Google's docs point new
+    # projects at gemini-3.5-flash-lite as well as gemini-3.8-flash.
+    # Empty (default) = no fallback, the friendly busy message is shown.
+    GEMINI_FALLBACK_MODEL: str = ""
 
     # Storage paths
     WORKSPACE_DIR: Path = Path("./workspace")

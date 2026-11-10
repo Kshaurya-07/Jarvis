@@ -590,6 +590,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.status === 429) {
           throw new Error(errData.detail || "Too many requests — please wait a little and try again.");
         }
+        if (response.status === 504 || response.status === 408) {
+          // Vercel gateway timeout: the chat function ran past its 10s
+          // limit (usually Gemini being slow/overloaded). Never show the
+          // raw "HTTP 504" to the user.
+          throw new Error("That took too long — please try again.");
+        }
         throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
       }
 
@@ -606,6 +612,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       if (err.name === "AbortError") {
         appendMessage("assistant", "Operation stopped by user.");
+      } else if (err.name === "TypeError") {
+        // The request never got a response (network dropped / fetch timed
+        // out). Same friendly wording as a 504 — never "Failed to fetch".
+        appendMessage("assistant", "That took too long — please try again.");
       } else {
         appendMessage("assistant", `Error: ${err.message}`);
       }

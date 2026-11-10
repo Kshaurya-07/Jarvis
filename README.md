@@ -283,6 +283,7 @@ gitignored. All settings have defaults in `backend/app/core/config.py`.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | — | **IGNORED since Phase 12 (BYOK).** Each user brings their own key in the app; there is no server key. Do not set it. |
 | `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini model used for chat and tool calling. |
+| `GEMINI_FALLBACK_MODEL` | — (none) | Optional fallback model, tried once when the primary model stays overloaded (503). Google's docs also list `gemini-3.5-flash-lite`. |
 | `CLOUD_MODE` | `false` | `true` on Vercel: sign-in mandatory, storage is Postgres, host is the Vercel domain. Local dev leaves it `false`. |
 | `DATABASE_URL` | — | **Required in production.** Neon Postgres connection string. Unset = local per-user files. |
 | `SESSION_SECRET` | — | **Required in cloud mode.** Long random secret (32+ chars) signing session JWTs; also the fallback BYOK encryption-key source. |

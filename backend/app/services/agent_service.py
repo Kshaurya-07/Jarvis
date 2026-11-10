@@ -1,4 +1,6 @@
 import os
+import re
+import time
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -6,6 +8,12 @@ from google import genai
 from google.genai import types
 
 from app.core.config import settings
+from app.core.gemini_errors import (
+    CHAT_TIME_BUDGET_SECONDS,
+    GEMINI_CALL_TIMEOUT_SECONDS,
+    classify_gemini_error,
+    generate_content_with_retry,
+)
 from app.core.logger import app_logger
 from app.core.store import get_user_store
 from app.core.user_context import UserIdentity, get_current_user, resolve_user
@@ -90,6 +98,36 @@ class AgentResponse(BaseModel):
     error: Optional[str] = None
 
 
+# Words that signal the message needs a tool (files, notes, reminders,
+# web search, mail, calendar, device actions...). The list is deliberately
+# biased toward the agent loop: an ambiguous message costs a little
+# latency, but a message wrongly sent down the fast path would get an
+# answer without the data it needed.
+_TOOL_INTENT_WORDS = (
+    "file|files|folder|note|notes|reminder|reminders|remind|remember|"
+    "memory|memories|forget|search|google|web|internet|gmail|email|mail|"
+    "inbox|calendar|event|meeting|schedule|screenshot|screen|battery|"
+    "storage|disk|ram|open|launch|app|apps|application|notepad|"
+    "calculator|paint|explorer|cmd|terminal|briefing|brief|news|weather|"
+    "browser|navigate|webpage|website|page|tab|summarise|summarize|summary"
+)
+_TOOL_INTENT_RE = re.compile(rf"\b(?:{_TOOL_INTENT_WORDS})\b")
+
+
+def _message_needs_tools(message: str) -> bool:
+    """Heuristic: does this message need a tool to answer?
+
+    URLs almost always mean "read this page". Otherwise, tool-intent words
+    (files, notes, reminders, search, mail, calendar, device actions...)
+    send the message to the full agent loop. Everything else — greetings,
+    small talk, plain Q&A — takes the fast path: one direct Gemini call.
+    """
+    text = (message or "").lower()
+    if "http://" in text or "https://" in text or "www." in text:
+        return True
+    return _TOOL_INTENT_RE.search(text) is not None
+
+
 class AgentService:
     """Orchestrates Gemini API interactions, tool dispatching, and conversation turns."""
 
@@ -109,7 +147,16 @@ class AgentService:
                 "No Gemini API key for this user. The user needs to add their own "
                 "free Gemini key in Settings (Google AI Studio) before chatting."
             )
-        return genai.Client(api_key=key)
+        # Fail fast instead of hanging: one call may take at most
+        # GEMINI_CALL_TIMEOUT_SECONDS, so a slow/overloaded Gemini cannot
+        # push the request past Vercel's 10s function timeout (raw HTTP 504).
+        # HttpOptions.timeout is in milliseconds.
+        return genai.Client(
+            api_key=key,
+            http_options=types.HttpOptions(
+                timeout=int(GEMINI_CALL_TIMEOUT_SECONDS * 1000)
+            ),
+        )
 
     def is_configured(self, user: Optional[UserIdentity] = None) -> bool:
         """Check whether this user has saved their own Gemini key (BYOK)."""
@@ -139,6 +186,11 @@ class AgentService:
         Uses ONLY the calling user's own Gemini key (BYOK); there is no
         shared server key. The turn is saved to that user's chat history so
         it syncs across their devices.
+
+        Simple messages (greetings, small talk, plain Q&A) take a fast path:
+        one direct Gemini call with no tools and no multi-round loop, so a
+        "hello" completes in a few seconds even when the model is slow-ish.
+        Messages that show tool intent use the full tool-calling loop.
         """
         _u = resolve_user(user or get_current_user())
         if not user_message or not user_message.strip():
@@ -212,17 +264,52 @@ class AgentService:
         ]
 
         executed_tools: List[ToolExecutionRecord] = []
-        max_turns = 5  # Prevent runaway tool call loops
+        # Latency guard: a chat request must fit inside Vercel Hobby's 10s
+        # function timeout. The whole request (all tool-call turns, plus one
+        # 503 retry) shares one deadline — when it passes, the next model
+        # call is not started and the user gets the friendly timeout message
+        # instead of a raw HTTP 504.
+        deadline = time.monotonic() + CHAT_TIME_BUDGET_SECONDS
+        max_turns = 3  # Prevent runaway tool call loops; also bounds latency
         turn = 0
 
         try:
+            # FAST PATH: greetings, small talk, and plain Q&A need no tools.
+            # One direct Gemini call, no tool declarations, no multi-round
+            # loop — a "hello" completes in 2-4s even when the model is
+            # slow-ish, well inside Vercel's 10s function timeout. Only
+            # messages that show tool intent take the full agent loop below.
+            if not _message_needs_tools(user_message):
+                fast_config = types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    temperature=0.2,
+                )
+                fast_response = await generate_content_with_retry(
+                    client,
+                    model=settings.GEMINI_MODEL,
+                    contents=contents,
+                    config=fast_config,
+                    fallback_model=settings.GEMINI_FALLBACK_MODEL,
+                    deadline=deadline,
+                )
+                fast_text = fast_response.text or ""
+                self._record_turn(_u, user_message, fast_text)
+                return AgentResponse(
+                    message=fast_text,
+                    tools_executed=[],
+                    success=True,
+                )
+
             while turn < max_turns:
                 turn += 1
 
-                response = client.models.generate_content(
+                response = await generate_content_with_retry(
+                    client,
                     model=settings.GEMINI_MODEL,
                     contents=contents,
                     config=config,
+                    fallback_model=settings.GEMINI_FALLBACK_MODEL,
+                    deadline=deadline,
                 )
 
                 # Check if Gemini decided to invoke any function calls
@@ -285,12 +372,17 @@ class AgentService:
             )
 
         except Exception as e:
-            app_logger.error("Gemini API call failed: %s", str(e), exc_info=True)
+            # Friendly message for the chat UI; the full technical detail
+            # stays in server logs only — never raw API JSON in chat.
+            error_code, friendly_message = classify_gemini_error(e)
+            app_logger.error(
+                "Gemini API call failed [%s]: %s", error_code, str(e), exc_info=True
+            )
             return AgentResponse(
-                message=f"Encountered an error while communicating with Gemini API: {str(e)}",
+                message=friendly_message,
                 tools_executed=executed_tools,
                 success=False,
-                error=str(e),
+                error=error_code,
             )
 
 
