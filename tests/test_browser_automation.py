@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import patch, MagicMock
 
 from app.core.config import settings
 from app.core.confirmation import confirmation_manager
@@ -15,7 +14,6 @@ from app.core.browser_automation import (
 from app.tools.registry import tool_registry
 from app.tools.browser_automation_tools import (
     browser_navigate,
-    browser_read_page,
     browser_fill_field,
 )
 
