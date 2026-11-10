@@ -5,8 +5,7 @@ import os
 import secrets
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import httpx
 import keyring
 
@@ -24,22 +23,18 @@ STATE_TTL_SECONDS = 600.0  # 10 minutes
 
 class GoogleAuthError(Exception):
     """Base exception for Google OAuth errors."""
-    pass
 
 
 class GoogleAuthRequiredError(GoogleAuthError):
     """Raised when an operation requires an active Google account connection."""
-    pass
 
 
 class GoogleTokenRevokedError(GoogleAuthError):
     """Raised when the stored OAuth token has been revoked or expired."""
-    pass
 
 
 class GoogleConfigError(GoogleAuthError):
     """Raised when Google OAuth credentials (client ID/secret) are missing."""
-    pass
 
 
 @dataclass
