@@ -1,6 +1,6 @@
 import secrets
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -38,7 +38,7 @@ class ConfirmationManager:
         # Safe arguments copy (remove any confirmation_id from comparison)
         safe_args = {k: v for k, v in arguments.items() if k != "confirmation_id"}
 
-        conf_id = f"conf_{secrets.token_hex(4)}"
+        conf_id = f"conf_{secrets.token_hex(16)}"
         action = PendingAction(
             confirmation_id=conf_id,
             tool_name=tool_name,
