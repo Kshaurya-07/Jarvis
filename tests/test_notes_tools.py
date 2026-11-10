@@ -1,5 +1,3 @@
-from pathlib import Path
-import pytest
 
 from app.core.config import settings
 from app.tools.notes_tools import create_note, search_notes
