@@ -23,13 +23,11 @@
       <nav class="site-nav" aria-label="Main navigation">
         <a href="#companion">Companion</a>
         <a href="#how">How it works</a>
-        <a href="#demo">Demo</a>
         <a href="#developers">Developers</a>
         <a href="#privacy">Safety</a>
         <a href="#access">Access</a>
       </nav>
       <div class="header-actions">
-        <a class="btn btn-ghost btn-small" href="/demo/">Study demo</a>
         <a class="btn btn-primary btn-small" href="/mobile/">Open Companion</a>
       </div>
     </div>
@@ -325,64 +323,10 @@
       </div>
     </section>
 
-    <!-- 04 · Live demo (simulated) -->
-    <section class="section" id="demo">
-      <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">04</span> · Live demo</p>
-        <h2 class="reveal">Watch it think — simulated.</h2>
-        <p class="section-intro reveal">This is a <strong>simulated demo</strong>. It runs
-          entirely in your browser and does not call the Jarvis backend, control any real
-          device, or use live AI. Pick a command and watch the steps Jarvis would take.</p>
-
-        <div class="tabs demo-tabs reveal" role="tablist" aria-label="Demo command">
-          <button class="tab-btn is-active" role="tab" aria-selected="true" data-demo="file">File</button>
-          <button class="tab-btn" role="tab" aria-selected="false" data-demo="website">Website</button>
-          <button class="tab-btn" role="tab" aria-selected="false" data-demo="reminder">Reminder</button>
-        </div>
-
-        <div class="demo-grid">
-          <div class="demo-phone card reveal">
-            <p class="demo-device-label">Phone · Companion app (simulated)</p>
-            <div class="demo-bubble" id="demo-command">“Meri file summarize karo.”</div>
-            <div class="demo-actions">
-              <button class="btn btn-primary" id="demo-run">Send to the cloud</button>
-              <button class="btn btn-ghost" id="demo-rerun">Run again</button>
-              <button class="btn btn-ghost" id="demo-reset">Reset</button>
-            </div>
-            <p class="demo-note" id="demo-note">Ready. Nothing has been sent anywhere.</p>
-            <div class="branch-map">
-              <p class="demo-device-label">Branch map — simulated</p>
-              <svg viewBox="0 0 420 150" role="img" aria-label="Branch map: three paths, one kept, the others dropped">
-                <line x1="20" y1="75" x2="120" y2="30" stroke="#b7a6f5" stroke-opacity="0.4"/>
-                <line x1="20" y1="75" x2="120" y2="75" stroke="#b7a6f5" stroke-opacity="0.4"/>
-                <line x1="20" y1="75" x2="120" y2="120" stroke="#b7a6f5" stroke-opacity="0.4"/>
-                <circle cx="20" cy="75" r="8" fill="#b7a6f5"/>
-                <g class="branch" data-branch="file"><circle cx="130" cy="30" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="34" text-anchor="middle">A</text><text x="160" y="26" class="branch-label">Read file</text><text x="160" y="42" class="branch-sub">keep</text></g>
-                <g class="branch" data-branch="website"><circle cx="130" cy="75" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="79" text-anchor="middle">B</text><text x="160" y="71" class="branch-label">Check domain</text><text x="160" y="87" class="branch-sub">keep</text></g>
-                <g class="branch" data-branch="reminder"><circle cx="130" cy="120" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="124" text-anchor="middle">C</text><text x="160" y="116" class="branch-label">Phone action</text><text x="160" y="132" class="branch-sub">not built yet</text></g>
-                <path class="branch-check" data-branch="file" d="M250 22 l6 6 l10 -12" fill="none" stroke="#7ddba3" stroke-width="2"/>
-                <path class="branch-check" data-branch="website" d="M250 67 l6 6 l10 -12" fill="none" stroke="#7ddba3" stroke-width="2"/>
-                <path class="branch-check" data-branch="reminder" d="M246 112 l14 14 M260 112 l-14 14" fill="none" stroke="#e8c87a" stroke-width="2"/>
-              </svg>
-              <p class="branch-note" id="branch-note">Branch A — reading a file inside the approved workspace.</p>
-            </div>
-          </div>
-
-          <div class="demo-laptop card reveal">
-            <p class="demo-device-label">Cloud · Jarvis (simulated) · <span class="sim-tag">Simulated demo</span></p>
-            <ol class="demo-log" id="demo-log" aria-live="polite">
-              <li class="demo-log-empty">No command yet. Choose one and press “Send to the cloud”.</li>
-            </ol>
-            <p class="demo-result" id="demo-result" hidden></p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 05 · Tools by category (real registry counts) -->
+    <!-- 04 · Tools by category (real registry counts) -->
     <section class="section" id="tools-chart">
       <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">05</span> · Tools by category</p>
+        <p class="eyebrow reveal"><span class="eyebrow-num">04</span> · Tools by category</p>
         <h2 class="reveal">Twenty-six tools, counted from the registry.</h2>
         <p class="section-intro reveal">The lower line is how many tools each category adds;
           the upper line is the running total. Both come from
@@ -439,10 +383,10 @@
       </div>
     </section>
 
-    <!-- 06 · For developers -->
+    <!-- 05 · For developers -->
     <section class="section" id="developers">
       <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">06</span> · For developers</p>
+        <p class="eyebrow reveal"><span class="eyebrow-num">05</span> · For developers</p>
         <h2 class="reveal">One backend, in the cloud.</h2>
         <p class="section-intro reveal">The Jarvis backend is a FastAPI app on Vercel serverless.
           No install, no laptop needed — sign in with Google and talk to it
@@ -468,21 +412,14 @@
             <p class="code-note" id="copy-note">Health check against the cloud backend. No key needed for /api/health.</p>
           </div>
 
-          <div class="stream-window card reveal">
-            <p class="demo-device-label">Stream · <span class="sim-tag">Simulated stream</span></p>
-            <ol class="stream-log" id="stream-log" aria-live="polite">
-              <li class="stream-empty">The stream plays when this section comes into view. It is a scripted preview, not a live backend call.</li>
-            </ol>
-            <button class="btn btn-ghost btn-small" id="stream-replay">Replay stream</button>
-          </div>
         </div>
       </div>
     </section>
 
-    <!-- 07 · Safety -->
+    <!-- 06 · Safety -->
     <section class="section" id="privacy">
       <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">07</span> · Safety</p>
+        <p class="eyebrow reveal"><span class="eyebrow-num">06</span> · Safety</p>
         <h2 class="reveal">Built to say when it can’t — and to prove what it did.</h2>
         <p class="section-intro reveal">Your account is the boundary. Everything Jarvis can do
           is gated by an allowlist, a confirmation, or a permission — and everything it
@@ -522,10 +459,10 @@
       </div>
     </section>
 
-    <!-- 08 · Access / setup -->
+    <!-- 07 · Access / setup -->
     <section class="section" id="access">
       <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">08</span> · Access</p>
+        <p class="eyebrow reveal"><span class="eyebrow-num">07</span> · Access</p>
         <h2 class="reveal">Start where it actually runs.</h2>
         <p class="section-intro reveal">No prices, no tiers to buy — Jarvis is a personal project
           that runs in the cloud. Pick the setup that matches where you are.</p>
@@ -601,10 +538,10 @@
       </div>
     </section>
 
-    <!-- 09 · From the project -->
+    <!-- 08 · From the project -->
     <section class="section" id="project">
       <div class="wrap">
-        <p class="eyebrow reveal"><span class="eyebrow-num">09</span> · From the project</p>
+        <p class="eyebrow reveal"><span class="eyebrow-num">08</span> · From the project</p>
         <h2 class="reveal">Notes, roadmap and code.</h2>
         <p class="section-intro reveal">Jarvis has no published papers. What it does have is
           the code, the safety rules in it, and the roadmap on this page.</p>
@@ -670,7 +607,7 @@
     <section class="section cta-section" id="start">
       <div class="wrap">
         <div class="cta-box reveal">
-          <p class="eyebrow"><span class="eyebrow-num">10</span> · Start here</p>
+          <p class="eyebrow"><span class="eyebrow-num">09</span> · Start here</p>
           <h2>Try it anywhere.</h2>
           <p>Ask it something hard — but ask the real companion, not this box.
             The box below is only a preview: it sends nothing anywhere.</p>
@@ -683,7 +620,6 @@
             Open the companion to ask for real.</p>
           <div class="hero-ctas">
             <a class="btn btn-primary" href="/mobile/">Open Companion</a>
-            <a class="btn btn-ghost" href="/demo/">Open study demo</a>
           </div>
         </div>
       </div>
@@ -695,9 +631,7 @@
       <nav aria-label="Footer, product">
         <p class="footer-col-title">Product</p>
         <a href="/mobile/">Companion</a>
-        <a href="/demo/">Study demo</a>
         <a href="#how">How it works</a>
-        <a href="#demo">Live demo</a>
       </nav>
       <nav aria-label="Footer, capabilities">
         <p class="footer-col-title">Capabilities</p>

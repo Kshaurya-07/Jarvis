@@ -752,8 +752,15 @@ async def login_callback(
     is returned as JSON (used by tests and API clients)."""
     from fastapi.responses import JSONResponse, RedirectResponse
 
-    frontend = settings.FRONTEND_URL.rstrip("/")
-    fail_url = f"{frontend}/mobile/?login=error"
+    # Redirects stay on the SAME ORIGIN as this callback request (relative
+    # URLs). The session cookie is a host-only cookie for that origin: an
+    # absolute redirect to a configured FRONTEND_URL on a different host
+    # (this project has two live Vercel domains — the plain domain and the
+    # -alpha domain) would land the user where the cookie does not exist,
+    # so sign-in would look like it never happened. A relative Location is
+    # resolved by the browser against the callback's own origin, which is
+    # exactly where the cookie was set. Same for local dev.
+    fail_url = "/mobile/?login=error"
 
     def _fail(detail: str):
         if format == "json":
@@ -787,7 +794,7 @@ async def login_callback(
             "session_token": token,
         })
     else:
-        resp = RedirectResponse(url=f"{frontend}/mobile/?login=success", status_code=302)
+        resp = RedirectResponse(url="/mobile/?login=success", status_code=302)
     resp.set_cookie("jarvis_session", token, max_age=settings.SESSION_TIMEOUT_SECONDS,
                     path="/", **_session_cookie_kwargs())
     resp.delete_cookie("jarvis_oauth_state", path="/api/auth/login/callback")

@@ -24,6 +24,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac as hmac_mod
+import re
 from typing import Any, Dict, Optional
 
 import httpx
@@ -71,13 +72,31 @@ def _hint(api_key: str) -> str:
     return f"…{api_key[-4:]}" if len(api_key) >= 4 else "…????"
 
 
+# Gemini API key formats (both are real keys issued by Google AI Studio):
+# * Classic keys: ``AIza`` + base64url chars (real ones are 39 chars total;
+#   the check below is deliberately lenient on length — total ≥ 30 — so
+#   near-format keys are not rejected on a counting technicality).
+# * Auth keys (all keys created in AI Studio since 2026-05-28): ``AQ.`` +
+#   40-60 base64url chars. These are service-account-bound "auth keys" and
+#   work with the Gemini Developer API via the ``x-goog-api-key`` header and
+#   the official SDKs, exactly like classic keys. Accepting only ``AIza``
+#   rejected every new AI Studio key (live bug, 2026-11-11).
+_CLASSIC_KEY_RE = re.compile(r"^AIza[0-9A-Za-z\-_]+$")
+_AUTH_KEY_RE = re.compile(r"^AQ\.[0-9A-Za-z\-_]{40,60}$")
+
+
 def validate_key_format(api_key: str) -> None:
-    """Loose format check for a Gemini API key (AIza…); raises ByokError."""
+    """Loose format check for a Gemini API key; raises ByokError.
+
+    Accepts both the classic ``AIza…`` format and the newer ``AQ.…`` auth
+    keys issued by Google AI Studio since 2026-05-28.
+    """
     key = (api_key or "").strip()
-    if len(key) < 30 or not key.startswith("AIza"):
+    if len(key) < 30 or not (_CLASSIC_KEY_RE.match(key) or _AUTH_KEY_RE.match(key)):
         raise ByokError(
             "That does not look like a Gemini API key. Gemini keys start with "
-            "'AIza' — copy yours from Google AI Studio (see README)."
+            "'AIza' (older keys) or 'AQ.' (new Google AI Studio keys) — copy "
+            "yours from Google AI Studio (see README)."
         )
 
 

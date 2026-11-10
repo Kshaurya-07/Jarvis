@@ -362,7 +362,6 @@ class DemoStatusResponse(BaseModel):
     app_version: str
     backend_connected: bool
     gemini_configured: bool
-    demo_page_url: str
     companion_url: str
     active_demo_data: Dict[str, int]
     steps: List[DemoStepInfo]

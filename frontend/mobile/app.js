@@ -27,12 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const settingsDrawer = document.getElementById("settings-drawer");
   const drawerBackdrop = document.getElementById("drawer-backdrop");
 
-  // Phase 10 Demo Drawer
-  const navDemoBtn = document.getElementById("nav-demo-btn");
-  const closeDemoBtn = document.getElementById("close-demo-btn");
-  const demoDrawer = document.getElementById("demo-drawer");
-  const seedDemoBtn = document.getElementById("seed-demo-btn");
-  const resetDemoBtn = document.getElementById("reset-demo-btn");
 
   const optInHistoryToggle = document.getElementById("opt-in-history-toggle");
   const clearHistoryBtn = document.getElementById("clear-history-btn");
@@ -116,7 +110,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function checkHealth() {
     try {
-      const resp = await apiFetch("/health", { cache: "no-store" });
+      // NOTE: /api/health, not /health. The backend is a Vercel serverless
+      // function that only receives /api/* requests (see vercel.json); a
+      // bare /health hits the static site, 404s, and the pill wrongly shows
+      // "Offline" even though the backend is up. /api/health works locally
+      // and on Vercel.
+      const resp = await apiFetch("/api/health", { cache: "no-store" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
@@ -130,7 +129,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         connectionPill.className = "connection-pill checking";
         connectionText.textContent = "Reachable (Unpaired)";
-        networkNotice.style.display = "flex";
+        // NOTE: the sign-in notice is owned by refreshMe() (auth state),
+        // not by the health check. Showing it here made every signed-in
+        // cloud user see "You're not signed in yet" (live bug, 2026-11-11).
       }
 
       if (sysVersion) sysVersion.textContent = data.version || "1.0.0";
@@ -189,10 +190,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const step2 = document.getElementById("onboard-step-2");
       if (step1) step1.classList.toggle("done", !!meState.authenticated);
       if (step2) step2.classList.toggle("done", !!meState.has_key);
+      // The sign-in notice belongs to auth state: a signed-in user must
+      // never see "You're not signed in yet". Local owners need no sign-in,
+      // so it stays hidden on localhost too. (Before this, refreshMe only
+      // ever SHOWED the notice when unauthenticated and never hid it.)
+      if (networkNotice) networkNotice.style.display = (meState.authenticated || isLocalhostHost) ? "none" : "flex";
+      updateWizard();
       if (onboardBanner) {
-        onboardBanner.style.display = (meState.authenticated && meState.has_key) ? "none" : "block";
+        // The static banner is only the fallback when the wizard is
+        // dismissed; never show both at once.
+        onboardBanner.style.display = (meState.authenticated && meState.has_key) || wizardVisible ? "none" : "block";
       }
-      if (!meState.authenticated && networkNotice) networkNotice.style.display = "flex";
       if (meState.authenticated && !historyLoaded) {
         historyLoaded = true;
         loadChatHistory();
@@ -228,19 +236,111 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Shared Gemini-key save (Settings button and wizard step 2 both use it).
+  async function saveGeminiKey(value) {
+    const key = (value || "").trim();
+    if (!key) throw new Error("Paste your Gemini key first.");
+    const resp = await apiFetch("/api/auth/key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: key }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || ("HTTP " + resp.status));
+  }
+
+  // --- Guided setup wizard: one popup step at a time. ---
+  const wizardOverlay = document.getElementById("setup-wizard");
+  const wizardStep1 = document.getElementById("wizard-step-1");
+  const wizardStep2 = document.getElementById("wizard-step-2");
+  const wizardStepDone = document.getElementById("wizard-step-done");
+  const wizardEyebrowNum = document.getElementById("wizard-eyebrow-num");
+  const wizardSigninBtn = document.getElementById("wizard-signin-btn");
+  const wizardSaveKeyBtn = document.getElementById("wizard-save-key-btn");
+  const wizardKeyInput = document.getElementById("wizard-key-input");
+  const wizardKeyMessageEl = document.getElementById("wizard-key-message");
+  const wizardOkBtn = document.getElementById("wizard-ok-btn");
+  const wizardCloseBtn = document.getElementById("wizard-close-btn");
+  const WIZARD_DISMISSED_KEY = "jarvis_setup_dismissed";
+  let wizardVisible = false;
+
+  function wizardWantedStep() {
+    if (meState.authenticated && meState.has_key) return 0; // done: never show
+    if (meState.authenticated) return 2;
+    return 1;
+  }
+  function showWizardStep(n) {
+    if (wizardStep1) wizardStep1.style.display = n === 1 ? "block" : "none";
+    if (wizardStep2) wizardStep2.style.display = n === 2 ? "block" : "none";
+    if (wizardStepDone) wizardStepDone.style.display = n === 3 ? "block" : "none";
+    if (wizardEyebrowNum) wizardEyebrowNum.textContent = n === 3 ? "03" : ("0" + n);
+  }
+  function updateWizard() {
+    if (!wizardOverlay) return;
+    const step = wizardWantedStep();
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(WIZARD_DISMISSED_KEY) === "1"; } catch (_) {}
+    if (step === 0 || dismissed) {
+      wizardVisible = false;
+      wizardOverlay.style.display = "none";
+      return;
+    }
+    wizardVisible = true;
+    wizardOverlay.style.display = "flex";
+    showWizardStep(step);
+  }
+  function dismissWizard() {
+    try { localStorage.setItem(WIZARD_DISMISSED_KEY, "1"); } catch (_) {}
+    wizardVisible = false;
+    if (wizardOverlay) wizardOverlay.style.display = "none";
+    if (onboardBanner) onboardBanner.style.display = (meState.authenticated && meState.has_key) ? "none" : "block";
+  }
+  if (wizardSigninBtn) wizardSigninBtn.addEventListener("click", goSignIn);
+  if (wizardCloseBtn) wizardCloseBtn.addEventListener("click", dismissWizard);
+  document.querySelectorAll("[data-wizard-dismiss]").forEach(function (btn) {
+    btn.addEventListener("click", dismissWizard);
+  });
+  if (wizardOkBtn) wizardOkBtn.addEventListener("click", function () {
+    wizardVisible = false;
+    if (wizardOverlay) wizardOverlay.style.display = "none";
+    if (commandInput) commandInput.focus();
+  });
+  if (wizardSaveKeyBtn) wizardSaveKeyBtn.addEventListener("click", async function () {
+    if (!wizardKeyInput || !(wizardKeyInput.value || "").trim()) {
+      if (wizardKeyMessageEl) wizardKeyMessageEl.textContent = "Paste your Gemini key first.";
+      return;
+    }
+    wizardSaveKeyBtn.disabled = true;
+    try {
+      await saveGeminiKey(wizardKeyInput.value);
+      wizardKeyInput.value = "";
+      if (wizardKeyMessageEl) wizardKeyMessageEl.textContent = "";
+      await refreshMe();
+      // Setup just completed: show the "You're good to start" panel.
+      if (meState.authenticated && meState.has_key) {
+        wizardVisible = true;
+        if (wizardOverlay) wizardOverlay.style.display = "flex";
+        showWizardStep(3);
+      }
+    } catch (err) {
+      if (wizardKeyMessageEl) wizardKeyMessageEl.textContent = "Couldn't save that key: " + err.message;
+    } finally {
+      wizardSaveKeyBtn.disabled = false;
+    }
+  });
+  if (wizardKeyInput) wizardKeyInput.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && wizardSaveKeyBtn) wizardSaveKeyBtn.click();
+  });
+
   if (saveKeyBtn) {
     saveKeyBtn.addEventListener("click", async () => {
-      const key = (keyInput?.value || "").trim();
-      if (!key) { if (keyMessageEl) keyMessageEl.textContent = "Paste your Gemini key first."; return; }
+      if (!keyInput || !(keyInput.value || "").trim()) {
+        if (keyMessageEl) keyMessageEl.textContent = "Paste your Gemini key first.";
+        return;
+      }
       saveKeyBtn.disabled = true;
       try {
-        const resp = await apiFetch("/api/auth/key", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_key: key }),
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(data.detail || ("HTTP " + resp.status));
+        await saveGeminiKey(keyInput.value);
         if (keyInput) keyInput.value = "";
         if (keyMessageEl) keyMessageEl.textContent = "Key saved — you're ready to chat.";
         refreshMe();
@@ -740,6 +840,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.add("has-fine-pointer");
     const glowEl = document.getElementById("cursor-glow");
     const ringEl = document.getElementById("cursor-ring");
+    const orbEls = Array.prototype.slice.call(document.querySelectorAll("#ambient-3d .orb i")).map(function (el) {
+      const host = el.parentElement;
+      return { el: el, depth: parseFloat((host && host.getAttribute("data-depth")) || "20") };
+    });
     const wordmarkEl = document.getElementById("chat-wordmark");
     const progressFill = document.getElementById("scroll-progress-fill");
     let gxT = -200, gyT = -200, gx = -200, gy = -200;
@@ -750,6 +854,16 @@ document.addEventListener("DOMContentLoaded", () => {
       rx += (rxT - rx) * 0.35; ry += (ryT - ry) * 0.35;
       if (glowEl) glowEl.style.transform = "translate3d(" + gx.toFixed(1) + "px," + gy.toFixed(1) + "px,0)";
       if (ringEl) ringEl.style.transform = "translate3d(" + rx.toFixed(1) + "px," + ry.toFixed(1) + "px,0)";
+      // Ambient orbs drift with the pointer at different depths (parallax).
+      // The CSS drift animation lives on the outer .orb; this moves the
+      // inner circle, so the two transforms never fight.
+      if (orbEls.length) {
+        const nx = (gx / Math.max(1, window.innerWidth) - 0.5) * 2;
+        const ny = (gy / Math.max(1, window.innerHeight) - 0.5) * 2;
+        orbEls.forEach(function (o) {
+          o.el.style.transform = "translate3d(" + (nx * o.depth).toFixed(1) + "px," + (ny * o.depth).toFixed(1) + "px,0)";
+        });
+      }
       ticking = false;
       if (Math.abs(gxT - gx) > 0.5 || Math.abs(gyT - gy) > 0.5 || Math.abs(rxT - rx) > 0.5 || Math.abs(ryT - ry) > 0.5) {
         requestTick();
@@ -818,10 +932,6 @@ document.addEventListener("DOMContentLoaded", () => {
     actionsDrawer.setAttribute("aria-hidden", "true");
     settingsDrawer.classList.remove("open");
     settingsDrawer.setAttribute("aria-hidden", "true");
-    if (demoDrawer) {
-      demoDrawer.classList.remove("open");
-      demoDrawer.setAttribute("aria-hidden", "true");
-    }
     drawerBackdrop.style.display = "none";
   }
 
@@ -838,60 +948,6 @@ document.addEventListener("DOMContentLoaded", () => {
   closeSettingsBtn.addEventListener("click", closeAllDrawers);
   drawerBackdrop.addEventListener("click", closeAllDrawers);
 
-  // Phase 10 Demo Drawer Events
-  if (navDemoBtn && demoDrawer) {
-    navDemoBtn.addEventListener("click", () => {
-      openDrawer(demoDrawer);
-    });
-  }
-  if (closeDemoBtn) {
-    closeDemoBtn.addEventListener("click", closeAllDrawers);
-  }
-
-  if (seedDemoBtn) {
-    seedDemoBtn.addEventListener("click", async () => {
-      seedDemoBtn.disabled = true;
-      try {
-        const resp = await apiFetch("/api/demo/seed", { method: "POST" });
-        const res = await resp.json();
-        if (resp.ok) {
-          appendMessage("assistant", `**Demo Data Seeded:** ${res.message || "Fictional mission notes, reminders, and memory created with [DEMO] tag."}`);
-          closeAllDrawers();
-        } else {
-          alert("Error seeding demo data: " + (res.detail || "Unknown error"));
-        }
-      } catch (err) {
-        alert("Network error: " + err.message);
-      } finally {
-        seedDemoBtn.disabled = false;
-      }
-    });
-  }
-
-  if (resetDemoBtn) {
-    resetDemoBtn.addEventListener("click", async () => {
-      if (!confirm("Are you sure you want to clear all mock [DEMO] notes, reminders, and memory? Real user data will not be touched.")) {
-        return;
-      }
-      resetDemoBtn.disabled = true;
-      try {
-        const resp = await apiFetch("/api/demo/reset", { method: "POST" });
-        const res = await resp.json();
-        if (resp.ok) {
-          appendMessage("assistant", `**Demo Cleanup Complete:** ${res.message || "All [DEMO] records have been removed."}`);
-          closeAllDrawers();
-        } else {
-          alert("Error resetting demo data: " + (res.detail || "Unknown error"));
-        }
-      } catch (err) {
-        alert("Network error: " + err.message);
-      } finally {
-        resetDemoBtn.disabled = false;
-      }
-    });
-  }
-
-  // --- Audit Feed Loading ---
   async function loadRecentActions() {
     actionsList.innerHTML = '<div class="actions-empty">Loading audit actions...</div>';
     try {

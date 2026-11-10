@@ -259,21 +259,10 @@ mobile_dir = frontend_dir / "mobile"
 if mobile_dir.exists():
     app.mount("/mobile", StaticFiles(directory=str(mobile_dir), html=True), name="mobile")
 
-# Phase 10: Mount Local Fictional Demo Sandbox
-demo_dir = frontend_dir / "demo"
-if demo_dir.exists():
-    app.mount("/demo", StaticFiles(directory=str(demo_dir), html=True), name="demo")
-
 # Vision landing page: static, no backend dependency
 landing_dir = frontend_dir / "landing"
 if landing_dir.exists():
     app.mount("/landing", StaticFiles(directory=str(landing_dir), html=True), name="landing")
-
-
-@app.get("/demo", tags=["Demo"])
-async def demo_redirect():
-    """Redirect to demo interface with trailing slash."""
-    return RedirectResponse(url="/demo/")
 
 
 @app.get("/companion", tags=["Companion"])

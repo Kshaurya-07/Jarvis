@@ -8,39 +8,7 @@ from app.tools.reminders_tools import reminders_storage
 from app.tools.memory_tools import memory_storage
 
 
-# --- 1. Local Demo Page Tests ---
-
-def test_demo_page_served_and_fictional_content(client: TestClient):
-    """Verify that the local demo page is served with rich fictional science content and no personal data."""
-    # Test GET /demo/
-    res = client.get("/demo/")
-    assert res.status_code == 200
-    assert "text/html" in res.headers["content-type"]
-    html = res.text
-
-    # Verify fictional title and key elements
-    assert "Deep Horizon: Exploring Europa's Subsurface Ocean" in html
-    assert "Fictional Science Dossier" in html
-    assert "id=\"demoSearchInput\"" in html
-    assert "id=\"studyQuizHelp\"" in html
-    assert "Deep-Ice Radar Sounder (DIRS)" in html
-    assert "Sub-Plume Mass Spectrometer (SPMS)" in html
-
-    # Verify safety and academic integrity notice
-    assert "Non-Graded Study Aid" in html
-    assert "Jarvis will <em>never</em> automatically select or submit quiz answers" in html
-
-    # Verify no real personal data, accounts, or secrets exist in the demo HTML
-    assert "password" not in html.lower() or "input type=\"password\"" not in html
-    assert "@gmail.com" not in html
-    assert "apikey" not in html.lower()
-
-    # Test /demo redirect
-    res_redirect = client.get("/demo", follow_redirects=False)
-    assert res_redirect.status_code in (200, 301, 302, 307, 308)
-
-
-# --- 2. Demo Status & Lifecycle Tests ---
+# --- 1. Demo Data API Tests ---
 
 def test_demo_status_api(client: TestClient):
     """Verify GET /api/demo/status returns accurate demo metadata, steps, and URL."""
@@ -50,7 +18,6 @@ def test_demo_status_api(client: TestClient):
 
     assert data["demo_version"] == "1.0"
     assert data["backend_connected"] is True
-    assert data["demo_page_url"] == "http://127.0.0.1:8000/demo/"
     assert data["companion_url"] == "http://127.0.0.1:8000/mobile/"
     assert "steps" in data
     assert len(data["steps"]) >= 7
@@ -123,7 +90,7 @@ def test_demo_seed_and_reset_lifecycle_isolates_user_data(client: TestClient):
     assert user_mem.content == "VS Code"
 
 
-# --- 3. End-to-End Companion Chat Flow ---
+# --- 2. End-to-End Companion Chat Flow ---
 
 def test_e2e_companion_chat_command(client: TestClient):
     """Verify sending a text command from companion to the laptop agent executes safely."""
@@ -153,7 +120,7 @@ def test_e2e_companion_chat_command(client: TestClient):
         assert data["tools_executed"][0]["tool_name"] == "get_system_status"
 
 
-# --- 4. End-to-End Chrome Extension Tab Inspection Flow ---
+# --- 3. End-to-End Chrome Extension Tab Inspection Flow ---
 
 def test_e2e_extension_read_page_grounded_summary(client: TestClient):
     """Verify Chrome extension can inspect active tab text and receive grounded response with disclosure."""
@@ -176,7 +143,7 @@ def test_e2e_extension_read_page_grounded_summary(client: TestClient):
         res = client.post(
             "/api/extension/read-page",
             json={
-                "url": "http://127.0.0.1:8000/demo/",
+                "url": "https://example.com/europa-mission-guide",
                 "title": "Deep Horizon: Europa Mission Guide",
                 "page_text": fictional_page_text,
                 "question": "What is the launch date and how thick is the ice?",
@@ -215,7 +182,7 @@ def test_e2e_extension_practice_quiz_help_mode(client: TestClient):
         res = client.post(
             "/api/extension/read-page",
             json={
-                "url": "http://127.0.0.1:8000/demo/",
+                "url": "https://example.com/europa-mission-guide",
                 "title": "Europa Mission Study Quiz",
                 "page_text": quiz_page_text,
                 "question": "Which option is correct for Question 1 and why?",
@@ -231,19 +198,19 @@ def test_e2e_extension_practice_quiz_help_mode(client: TestClient):
         assert "practice quiz" in data["disclosure"].lower() or "study" in data["disclosure"].lower()
 
 
-# --- 5. Browser Automation Safe Field Filling on Demo Page ---
+# --- 4. Browser Automation Safe Field Filling ---
 
-def test_e2e_demo_safe_field_fill_workflow(client: TestClient):
-    """Verify safe non-sensitive field filling on the demo page with confirmation."""
-    # 1. Plan field fill on local demo page
+def test_e2e_safe_field_fill_workflow(client: TestClient):
+    """Verify safe non-sensitive field filling on a local page with confirmation."""
+    # 1. Plan field fill on a local page
     res_plan = client.post(
         "/api/browser/plan-action",
         json={
             "action_type": "fill_field",
             "approved_domain": "127.0.0.1",
-            "selector": "#demoSearchInput",
+            "selector": "#searchInput",
             "value": "subsurface thermal vents",
-            "field_description": "Search input on Europa demo dossier",
+            "field_description": "Search input on local page",
         },
     )
     assert res_plan.status_code == 200
@@ -251,7 +218,7 @@ def test_e2e_demo_safe_field_fill_workflow(client: TestClient):
     assert plan_data["requires_confirmation"] is True
     conf_id = plan_data["confirmation_id"]
     assert conf_id is not None
-    assert "Search input on Europa demo dossier" in plan_data["description"]
+    assert "Search input on local page" in plan_data["description"]
     assert plan_data["approved_domain"] == "127.0.0.1"
 
     # 2. Confirm the planned action
@@ -265,8 +232,8 @@ def test_e2e_demo_safe_field_fill_workflow(client: TestClient):
     assert "success" in conf_data["message"].lower()
 
 
-def test_e2e_sensitive_field_fill_blocked_on_demo_page(client: TestClient):
-    """Verify password and sensitive fields are strictly blocked even on approved local demo domain."""
+def test_e2e_sensitive_field_fill_blocked(client: TestClient):
+    """Verify password and sensitive fields are strictly blocked even on an approved local domain."""
     # Attempt to plan filling a password field
     res_plan = client.post(
         "/api/browser/plan-action",
@@ -282,17 +249,20 @@ def test_e2e_sensitive_field_fill_blocked_on_demo_page(client: TestClient):
     assert "refusal" in res_plan.json()["detail"].lower() or "sensitive" in res_plan.json()["detail"].lower()
 
 
-# --- 6. Mobile Web UI Companion Static Serving Tests ---
+# --- 5. Mobile Web UI Companion Static Serving Tests ---
 
-def test_mobile_companion_serves_demo_tour_elements(client: TestClient):
-    """Verify the mobile web companion serves the Phase 10 demo tour button and drawer."""
+def test_mobile_companion_has_no_demo_ui(client: TestClient):
+    """The demo section was removed: the Companion must not serve the
+    Demo Tour button, demo drawer, or demo seed/reset controls anymore."""
     res = client.get("/mobile/")
     assert res.status_code == 200
     html = res.text
 
-    assert "id=\"nav-demo-btn\"" in html
-    assert "Demo Tour" in html
-    assert "id=\"demo-drawer\"" in html
-    assert "id=\"seed-demo-btn\"" in html
-    assert "id=\"reset-demo-btn\"" in html
-    assert "Phase 10 Guided Demo" in html
+    assert "nav-demo-btn" not in html
+    assert "Demo Tour" not in html
+    assert "demo-drawer" not in html
+    assert "seed-demo-btn" not in html
+    assert "reset-demo-btn" not in html
+    assert "Guided Demo" not in html
+    # The Companion itself still serves.
+    assert "Jarvis" in html

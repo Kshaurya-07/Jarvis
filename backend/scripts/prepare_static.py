@@ -5,7 +5,6 @@ Vercel deployment. Copies only the intended public client-side static assets:
 - `frontend/landing/` -> `frontend/public/` (Jarvis vision landing page — the HOMEPAGE at /)
 - `frontend/landing/` -> `frontend/public/landing/` (same landing page, /landing/ alias)
 - `frontend/mobile/`  -> `frontend/public/mobile/` (Mobile Companion PWA at /mobile/)
-- `frontend/demo/`    -> `frontend/public/demo/` (Local Fictional Science Demo Page at /demo/)
 
 Zero backend source code, zero python runtimes, zero data folders, and zero secrets
 are ever copied into the public output.
@@ -19,12 +18,10 @@ def prepare_static():
     root = Path(__file__).resolve().parent.parent.parent
     frontend_dir = root / "frontend"
     mobile_dir = frontend_dir / "mobile"
-    demo_dir = frontend_dir / "demo"
     landing_dir = frontend_dir / "landing"
     public_dir = frontend_dir / "public"
 
     assert mobile_dir.exists(), f"Source mobile directory not found: {mobile_dir}"
-    assert demo_dir.exists(), f"Source demo directory not found: {demo_dir}"
     assert landing_dir.exists(), f"Source landing directory not found: {landing_dir}"
 
     print(f"Preparing dedicated public output directory: {public_dir}")
@@ -33,7 +30,6 @@ def prepare_static():
     public_dir.mkdir(parents=True, exist_ok=True)
     (public_dir / "mobile").mkdir(parents=True, exist_ok=True)
     (public_dir / "mobile" / "icons").mkdir(parents=True, exist_ok=True)
-    (public_dir / "demo").mkdir(parents=True, exist_ok=True)
     (public_dir / "landing").mkdir(parents=True, exist_ok=True)
 
     # 1. Copy landing page assets to public ROOT — the landing page is the homepage.
@@ -81,11 +77,12 @@ def prepare_static():
         shutil.copy2(icon, icons_dest / icon.name)
         print(f"  Copied icon: mobile/icons/{icon.name}")
 
-    # 3. Copy demo page to public/demo/
-    demo_src = demo_dir / "index.html"
-    demo_dest = public_dir / "demo" / "index.html"
-    shutil.copy2(demo_src, demo_dest)
-    print(f"  Copied demo page: demo/index.html")
+    # 3. The demo page was removed (2026-11-11): delete any stale copy so
+    #    /demo/ stops being served from a leftover build artifact.
+    stale_demo = public_dir / "demo"
+    if stale_demo.exists():
+        shutil.rmtree(stale_demo)
+        print("  Removed stale demo output: demo/")
 
     print("\nSUCCESS: Dedicated public directory populated successfully.")
     print("Files in public output directory:")

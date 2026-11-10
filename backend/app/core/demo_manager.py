@@ -71,7 +71,6 @@ class DemoManager:
             "app_version": __version__,
             "backend_connected": True,
             "gemini_configured": agent_service.is_configured(),
-            "demo_page_url": "http://127.0.0.1:8000/demo/",
             "companion_url": "http://127.0.0.1:8000/mobile/",
             "active_demo_data": {
                 "demo_notes_count": len(demo_notes),

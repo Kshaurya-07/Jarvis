@@ -20,6 +20,10 @@ USER_A = UserIdentity(sub="google-sub-user-a", email="a@example.com", name="User
 USER_B = UserIdentity(sub="google-sub-user-b", email="b@example.com", name="User B")
 TEST_KEY_A = "AIzaSyTestKeyForUserA1234567890abcdefg"
 TEST_KEY_B = "AIzaSyTestKeyForUserB1234567890abcdefg"
+# Fake new-format AI Studio "auth key" (AQ. + 50 base64url chars). Synthetic —
+# never a real key. All keys created in AI Studio since 2026-05-28 use this
+# shape instead of the classic AIza… prefix (live bug, 2026-11-11).
+TEST_KEY_AQ = "AQ.Qw3rTy6uIo9pAs2dFg4hJk7lZx1cVbNm8Qw3rTy6uIo9pAs2dF"
 
 
 def auth_headers(user: UserIdentity) -> dict:
@@ -204,6 +208,39 @@ def test_login_callback_mints_session_and_me_works(monkeypatch):
             assert me.json()["has_key"] is False
 
 
+def test_login_callback_browser_flow_sets_session_cookie_and_me_authenticates(monkeypatch):
+    """Regression: sign-in must stick in the browser. The callback redirects
+    (relative URL, same origin so the cookie survives) and sets the session
+    cookie; a follow-up /api/auth/me with that cookie must authenticate.
+    Before the fix, the redirect went to absolute FRONTEND_URL, so landing on
+    the other live domain meant the cookie's origin never matched and the
+    Companion kept showing 'You're not signed in yet'."""
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
+    fake_identity = {"sub": "google-sub-user-b", "email": "b@example.com", "name": "User B"}
+    with patch(
+        "app.core.google_auth.google_auth_manager.exchange_login_code",
+        return_value=fake_identity,
+    ):
+        with TestClient(app) as client:
+            start = client.get("/api/auth/login?format=json")
+            assert start.status_code == 200
+            state = start.json()["state"]
+            cb = client.get(
+                f"/api/auth/login/callback?code=fake-code&state={state}",
+                follow_redirects=False,
+            )
+            assert cb.status_code in (302, 303, 307), cb.text
+            # Relative redirect: same origin as the cookie. An absolute
+            # FRONTEND_URL redirect would lose the cookie on the other domain.
+            assert cb.headers["location"] == "/mobile/?login=success"
+            assert "jarvis_session" in cb.headers.get("set-cookie", "")
+            # The cookie the callback set authenticates /auth/me.
+            me = client.get("/api/auth/me")
+            assert me.status_code == 200
+            assert me.json()["authenticated"] is True
+            assert me.json()["email"] == "b@example.com"
+
+
 def test_login_callback_rejects_state_mismatch(monkeypatch):
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
     with TestClient(app) as client:
@@ -245,6 +282,61 @@ def test_byok_key_save_is_masked_and_encrypted(monkeypatch, tmp_path):
         deleted = client.delete("/api/auth/key", headers=auth_headers(USER_A))
         assert deleted.json()["deleted"] is True
         assert client.get("/api/auth/key/status", headers=auth_headers(USER_A)).json()["has_key"] is False
+
+
+def test_aq_auth_key_format_accepted_and_garbage_rejected():
+    """Live bug (2026-11-11): new AI Studio keys start with 'AQ.', not 'AIza'.
+
+    validate_key_format() only accepted AIza…, so every key created in AI
+    Studio since 2026-05-28 was rejected with "does not look like a Gemini
+    API key". Both formats must pass; non-keys must still fail.
+    """
+    from app.core.byok import ByokError, validate_key_format
+
+    # Both real formats pass (classic + new AQ. auth key).
+    validate_key_format(TEST_KEY_A)
+    validate_key_format(TEST_KEY_AQ)
+    validate_key_format("  " + TEST_KEY_AQ + "\n")  # surrounding whitespace is stripped
+    # Non-keys still fail.
+    for bad in [
+        "not-a-gemini-key",
+        "short",
+        "AIza",  # prefix only, no key material
+        "AIza" + "a" * 10,  # classic shape, too short (total < 30 chars)
+        "AQ.",  # prefix only
+        "AQ." + "a" * 10,  # AQ. shape, too short (needs 40-60 chars after AQ.)
+        "AQ." + "a" * 61,  # AQ. shape, too long
+        "AQ." + "a" * 49 + "!",  # illegal character in key material
+        "GOCSPX-" + "a" * 28,  # Google OAuth client SECRET, not a Gemini key
+        "123456789012-abcdef.apps.googleusercontent.com",  # OAuth client ID
+    ]:
+        with pytest.raises(ByokError, match="does not look like a Gemini API key"):
+            validate_key_format(bad)
+
+
+def test_aq_auth_key_save_via_endpoint(monkeypatch, tmp_path):
+    """A new-format AQ. key saves, is masked, and is encrypted at rest."""
+    with cloud_client(monkeypatch) as client:
+        resp = client.post("/api/auth/key", json={"api_key": TEST_KEY_AQ}, headers=auth_headers(USER_A))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["has_key"] is True
+        assert resp.json()["hint"] == "…s2dF"
+        assert TEST_KEY_AQ not in resp.text
+        st = client.get("/api/auth/key/status", headers=auth_headers(USER_A))
+        assert st.json()["has_key"] is True
+        assert TEST_KEY_AQ not in st.text
+        key_file = user_paths(USER_A).gemini_key_file
+        assert key_file.exists()
+        assert TEST_KEY_AQ.encode() not in key_file.read_bytes()
+
+
+def test_aq_auth_key_is_scrubbed_from_logs():
+    """Log scrubbing must redact AQ. keys too, not just classic AIza… keys."""
+    from app.core.logger import scrub_sensitive_text
+
+    assert TEST_KEY_AQ not in scrub_sensitive_text(f"call failed key={TEST_KEY_AQ}")
+    assert "[REDACTED_KEY]" in scrub_sensitive_text(f"call failed key={TEST_KEY_AQ}")
+    assert TEST_KEY_A not in scrub_sensitive_text(f"call failed key={TEST_KEY_A}")
 
 
 def test_chat_without_key_prompts_for_byok_key(monkeypatch):
@@ -398,7 +490,8 @@ def test_vercel_entrypoint_and_config():
     assert not any(r["destination"].endswith(".py") for r in rewrites)
     assert vercel["functions"]["api/index.py"]["maxDuration"] == 10
     # Other rewrites must exist too: /companion and /companion/ serve the
-    # Companion PWA, /landing and /demo serve their static pages.
+    # Companion PWA, /landing serves the static landing page. There is no
+    # /demo rewrite anymore — the demo section was removed.
     by_source = {r["source"]: r["destination"] for r in rewrites}
     # /companion is an alias for the Companion PWA: destination is the
     # directory ("/mobile/"), not "/mobile/index.html" — with cleanUrls on,
@@ -407,7 +500,7 @@ def test_vercel_entrypoint_and_config():
     assert by_source["/companion"] == "/mobile/"
     assert by_source["/companion/"] == "/mobile/"
     assert by_source["/landing"] == "/landing/index.html"
-    assert by_source["/demo"] == "/demo/index.html"
+    assert "/demo" not in by_source and "/demo/" not in by_source
     # backend/app/ must be deployed: api/index.py does `from app.main import
     # app`. If .vercelignore excluded it, every invocation would fail with
     # ModuleNotFoundError (live symptom: /api -> 500 FUNCTION_INVOCATION_FAILED).

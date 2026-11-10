@@ -74,9 +74,11 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background-color: rgba(30, 41, 59, 0.95);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(24, 22, 32, 0.82), rgba(10, 10, 13, 0.72));
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid rgba(183, 166, 245, 0.28);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(245, 241, 232, 0.07);
   z-index: 10;
   min-height: 60px;
 }
@@ -187,6 +189,43 @@ body {
   color: var(--text-primary);
   background-color: var(--bg-tertiary);
 }
+
+/* ==========================================================================
+   Futuristic interactive menu bar (glass, glow, hover feedback).
+   Same violet-lilac accent as the landing page. Hover lifts + glows;
+   press scales down. Touch keeps the same buttons, just compact.
+   ========================================================================== */
+@keyframes orb-pulse {
+  0%, 100% { box-shadow: 0 0 10px var(--accent); transform: scale(1); }
+  50% { box-shadow: 0 0 20px var(--accent), 0 0 34px rgba(183, 166, 245, 0.45); transform: scale(1.12); }
+}
+.logo-orb { animation: orb-pulse 3.2s ease-in-out infinite; }
+.header-brand h1 { text-shadow: 0 0 18px rgba(183, 166, 245, 0.35); }
+
+.nav-pill, .icon-btn {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+.nav-pill:hover, .icon-btn:hover {
+  transform: translateY(-1px) scale(1.04);
+  border-color: rgba(183, 166, 245, 0.55);
+  box-shadow: 0 0 16px rgba(183, 166, 245, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+}
+.nav-pill:active, .icon-btn:active { transform: scale(0.96); }
+.nav-pill:focus-visible, .icon-btn:focus-visible {
+  outline: 2px solid rgba(183, 166, 245, 0.8);
+  outline-offset: 2px;
+}
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--success); }
+  50% { box-shadow: 0 0 14px var(--success), 0 0 22px rgba(125, 219, 163, 0.5); }
+}
+.connection-pill { transition: box-shadow 0.25s ease, border-color 0.25s ease; }
+.connection-pill.online {
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+}
+.connection-pill.online .status-dot { animation: status-pulse 2.4s ease-in-out infinite; }
+.connection-pill.offline { box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); }
 
 /* Network Notice Banner (Option B) */
 .network-notice {
@@ -808,8 +847,8 @@ body {
   }
 }
 
-/* Phase 10: Demo Mode Styles */
-.demo-pill {
+/* Header pill buttons. */
+.nav-pill {
   background: rgba(56, 189, 248, 0.12);
   border: 1px solid rgba(56, 189, 248, 0.4);
   color: var(--accent);
@@ -823,70 +862,8 @@ body {
   gap: 5px;
   transition: var(--transition);
 }
-.demo-pill:hover {
+.nav-pill:hover {
   background: rgba(56, 189, 248, 0.22);
-}
-
-.demo-step-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-bottom: 10px;
-}
-.demo-step-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--accent);
-  margin-bottom: 4px;
-}
-.demo-step-num {
-  background: rgba(56, 189, 248, 0.2);
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-}
-.demo-step-desc {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.demo-actions-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.btn-demo-action {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.btn-demo-action:hover {
-  background: #475569;
-}
-.btn-demo-danger {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-.btn-demo-danger:hover {
-  background: rgba(239, 68, 68, 0.2);
 }
 
 
@@ -1044,6 +1021,86 @@ body.has-fine-pointer #cursor-ring.is-hover {
 .onboarding li.done { color: var(--muted); text-decoration: line-through; }
 .onboarding li.done .step-num { color: var(--success); }
 
+/* Guided setup wizard: one step at a time, same design family as the
+   landing page (near-black, warm off-white, violet-lilac accent). No
+   entrance animation — step changes are instant, so reduced-motion needs
+   no special handling. */
+.wizard-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 5, 7, 0.78);
+  padding: 16px;
+}
+.wizard-card {
+  position: relative;
+  width: 100%; max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+.wizard-card h2 { font-size: 1.25rem; letter-spacing: -0.02em; margin: 8px 0 6px; }
+.wizard-card p { color: var(--muted); font-size: 0.92rem; margin-bottom: 12px; }
+.wizard-card .wizard-steps-list { margin: 0 0 12px 18px; font-size: 0.85rem; color: var(--muted); display: grid; gap: 4px; }
+.wizard-card .wizard-steps-list code { color: var(--text); }
+.wizard-card #wizard-key-input { width: 100%; padding: 0.5rem; background: #121215; border: 1px solid var(--line); border-radius: 6px; color: #f5f1e8; font-size: 0.85rem; }
+.wizard-close {
+  position: absolute; top: 10px; right: 12px;
+  background: none; border: none; color: var(--muted);
+  font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 4px 8px;
+}
+.wizard-close:hover { color: var(--text); }
+.wizard-skip {
+  display: block; margin: 12px auto 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 0.85rem; text-decoration: underline;
+}
+.wizard-skip:hover { color: var(--text); }
+
+/* ==========================================================================
+   Full-screen desktop layout + flowing ambient 3D.
+   The app used to be a 768px column centred on a black void on laptops.
+   On desktop the shell is now full-bleed: header/footer span the viewport
+   while the readable chat column stays centred (960px). The ambient layer
+   is a fixed, pointer-events:none backdrop of drifting orbs at different
+   depths (CSS drift + pointer parallax in initMotion). It is decorative
+   only: it never covers the input, never intercepts clicks, is hidden on
+   touch (pointer: coarse) and under prefers-reduced-motion.
+   ========================================================================== */
+#ambient-3d {
+  position: fixed; inset: 0; z-index: 0;
+  overflow: hidden; pointer-events: none;
+}
+#ambient-3d .orb { position: absolute; will-change: transform; }
+#ambient-3d .orb i {
+  display: block; width: 100%; height: 100%;
+  border-radius: 50%; will-change: transform;
+}
+.orb-1 { width: 420px; height: 420px; left: -6%; top: 8%; animation: orb-drift-1 46s ease-in-out infinite alternate; }
+.orb-1 i { background: radial-gradient(circle, rgba(183, 166, 245, 0.28), transparent 65%); filter: blur(50px); }
+.orb-2 { width: 340px; height: 340px; right: -4%; top: 22%; animation: orb-drift-2 58s ease-in-out infinite alternate; }
+.orb-2 i { background: radial-gradient(circle, rgba(125, 140, 255, 0.22), transparent 65%); filter: blur(55px); }
+.orb-3 { width: 260px; height: 260px; left: 12%; bottom: -6%; animation: orb-drift-3 64s ease-in-out infinite alternate; }
+.orb-3 i { background: radial-gradient(circle, rgba(245, 241, 232, 0.12), transparent 65%); filter: blur(45px); }
+.orb-4 { width: 200px; height: 200px; right: 18%; bottom: 12%; animation: orb-drift-1 38s ease-in-out infinite alternate-reverse; }
+.orb-4 i { background: radial-gradient(circle, rgba(183, 166, 245, 0.2), transparent 65%); filter: blur(40px); }
+.orb-5 { width: 150px; height: 150px; left: 44%; top: 38%; animation: orb-drift-2 52s ease-in-out infinite alternate; }
+.orb-5 i { background: radial-gradient(circle, rgba(150, 120, 255, 0.18), transparent 65%); filter: blur(36px); }
+@keyframes orb-drift-1 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(90px, 60px, 0); } }
+@keyframes orb-drift-2 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-70px, 80px, 0); } }
+@keyframes orb-drift-3 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(60px, -70px, 0); } }
+@media (pointer: coarse) { #ambient-3d { display: none; } }
+
+@media (min-width: 769px) {
+  /* Full-bleed shell; the app container's own background goes transparent
+     so the ambient orbs show through around the chat column. */
+  .app-container { max-width: none; box-shadow: none; background: transparent; }
+  .app-header { padding-left: max(16px, calc((100vw - 1200px) / 2)); padding-right: max(16px, calc((100vw - 1200px) / 2)); }
+  .chat-stream { padding-left: max(24px, calc((100vw - 960px) / 2)); padding-right: max(24px, calc((100vw - 960px) / 2)); }
+  .app-footer .input-row, .app-footer .quick-chips-scroll { max-width: 960px; width: 100%; margin-left: auto; margin-right: auto; }
+}
+
 /* Account / key settings blocks. */
 .account-email { font-size: 0.95rem; margin: 4px 0 10px; }
 .key-status { font-size: 0.85rem; color: var(--muted); margin: 6px 0; }
@@ -1054,5 +1111,8 @@ body.has-fine-pointer #cursor-ring.is-hover {
   .message { animation: none; }
   .chat-stream { scroll-behavior: auto; }
   #cursor-glow, #cursor-ring { display: none !important; }
+  #ambient-3d { display: none !important; }
+  .orb { animation: none !important; }
+  .logo-orb, .connection-pill.online .status-dot { animation: none !important; }
   * { transition-duration: 0.01ms !important; }
 }

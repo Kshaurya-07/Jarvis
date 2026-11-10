@@ -92,9 +92,10 @@ to share passwords or API keys in chat.
   mode only — in cloud mode your data already lives in Postgres, which
   provides its own backups). Every action is written to a per-user audit
   log with keys, tokens, emails, and card numbers redacted.
-- **Demo mode** — a self-contained fictional demo page at `/demo/` with
-  `/api/demo/status`, `/api/demo/seed`, and `/api/demo/reset`. Seeded items
-  are tagged `[DEMO]` and reset removes only those items.
+- **Demo data API** — `/api/demo/status`, `/api/demo/seed`, and
+  `/api/demo/reset` manage `[DEMO]`-tagged seed data (notes, reminders,
+  memories) for testing; reset removes only those items. There is no demo
+  page or demo UI — the demo section was removed.
 
 ## Requirements
 
@@ -188,7 +189,7 @@ a serverless function (`api/index.py`, routed by `vercel.json` so every
 
 1. Open [Google AI Studio](https://aistudio.google.com/) → **Get API key**
    → **Create API key**.
-2. Copy it (it starts with `AIza`).
+2. Copy it (it starts with `AIza` for older keys, or `AQ.` for keys created in AI Studio since May 2026).
 3. In Jarvis: Settings → Your Gemini key → paste → **Save key**. The
    app shows only the last 4 characters afterwards, and **Validate**
    checks it against Google before you chat. Free-tier quotas apply to
@@ -247,7 +248,7 @@ On macOS/Linux use `python3 -m venv .venv`,
 
 Open `http://127.0.0.1:8000/` (redirects to the vision landing page at
 `/landing/`, the homepage), `http://127.0.0.1:8000/mobile/` for the
-companion, or `http://127.0.0.1:8000/demo/`. Check health with
+companion. Check health with
 `GET http://127.0.0.1:8000/health`. In local mode, sign-in is optional:
 loopback requests act as the local owner, and your own Gemini key is
 saved the same way (Settings → Your Gemini key).
@@ -408,7 +409,8 @@ user can drain the quota or run up the bill. BYOK removes the cost and
 abuse risk entirely: each user's calls are charged to their own free
 Google AI Studio quota, and nobody can spend anyone else's.
 
-- **Validation:** keys must look like a Gemini key (`AIza…`, ≥ 30 chars)
+- **Validation:** keys must look like a Gemini key (`AIza…` classic keys, or
+  `AQ.…` auth keys issued by Google AI Studio since May 2026; ≥ 30 chars)
   before saving. `POST /api/auth/key/validate` calls Google's models
   list with the key — a read-only check, no generation call.
 - **Encryption at rest:** the key is encrypted with Fernet
@@ -539,7 +541,7 @@ laptop the skipped tests run. The suite covers routes, confirmation
 lifecycle, security (path traversal, file-size caps, extension checks),
 DNS rebinding and referer defenses, rate limiting, Google OAuth, Gmail
 and Calendar read-only behaviour, search and briefing safeguards, remote
-authentication, and the demo flow. `backend/tests/test_cloud_byok.py`
+authentication. `backend/tests/test_cloud_byok.py`
 (19 tests) covers the cloud path specifically: cloud-mode 401s,
 health-leak check, login URL/scopes, callback → session → `/auth/me`,
 state-mismatch rejection, BYOK save/masked/encrypted-at-rest/delete,
@@ -620,13 +622,12 @@ Jarvis/
 │   ├── mobile/                  # Mobile PWA companion (/mobile/, alias /companion/)
 │   │   ├── config.js            # API base URL ("" = same origin; override for a separate backend)
 │   │   └── icons/               # icon-192.png, icon-512.png (manifest + service worker)
-│   ├── demo/                    # Fictional local demo page (/demo/)
 │   ├── extension/               # Chrome extension, Manifest V3 (activeTab, scripting)
 │   │   └── icons/               # icon16.png, icon48.png, icon128.png (manifest.json)
 │   └── public/                  # Static build output for the hosted site
 │       ├── index.html           # landing page at / (copied from frontend/landing/)
 │       ├── mobile/              # companion at /mobile/ (copied from frontend/mobile/)
-│       └── landing/, demo/      # (generated — run backend/scripts/prepare_static.py;
+│       └── landing/             # (generated — run backend/scripts/prepare_static.py;
 │                                #  the committed output must stay in sync, checked by CI)
 ├── api/
 │   ├── index.py                 # Vercel serverless entrypoint (exposes `app`)
@@ -641,7 +642,7 @@ Jarvis/
 │   │   ├── core/                # config, security, confirmation, remote auth,
 │   │   │                        # Google OAuth + login, session JWT, BYOK encryption,
 │   │   │                        # per-user store (file + Postgres), usage limits,
-│   │   │                        # data manager, demo manager, logger
+│   │   │                        # data manager, logger
 │   │   ├── services/            # Gemini agent service (BYOK), extension service
 │   │   └── tools/               # 26 registered tools (workspace, notes, system,
 │   │                            # screenshots, reminders, memory, search, briefing,
@@ -649,7 +650,7 @@ Jarvis/
 │   ├── tests/                   # 179 passing tests across 22 test files (22 skipped on Linux)
 │   ├── scripts/
 │   │   └── prepare_static.py    # Builds frontend/public/ from frontend/mobile/,
-│   │                            # frontend/demo/ and frontend/landing/
+│   │                            # frontend/landing/
 │   └── requirements.txt         # Python dependencies
 ├── .env.example                 # Environment variable template (no real secrets)
 ├── .gitignore

@@ -42,14 +42,6 @@
     {
       "source": "/landing",
       "destination": "/landing/index.html"
-    },
-    {
-      "source": "/demo",
-      "destination": "/demo/index.html"
-    },
-    {
-      "source": "/demo/",
-      "destination": "/demo/index.html"
     }
   ],
   "functions": {

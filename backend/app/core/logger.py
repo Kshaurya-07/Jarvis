@@ -17,7 +17,7 @@ app_logger = logging.getLogger("jarvis")
 # Sensitive data redaction patterns for audit log entries
 REDACTION_PATTERNS = [
     (re.compile(r"(?i)(?:password|passwd|pwd|secret|token|api_key)\s*[:=]\s*\S+"), "[REDACTED_SECRET]"),
-    (re.compile(r"(?:AIza[0-9A-Za-z-_]{35}|sk-[a-zA-Z0-9]{20,}|gh[pousr]_[a-zA-Z0-9]{20,}|tvly-[a-zA-Z0-9_-]+)"), "[REDACTED_KEY]"),
+    (re.compile(r"(?:AIza[0-9A-Za-z\-_]{26,}|AQ\.[0-9A-Za-z\-_]{35,}|sk-[a-zA-Z0-9]{20,}|gh[pousr]_[a-zA-Z0-9]{20,}|tvly-[a-zA-Z0-9_-]+)"), "[REDACTED_KEY]"),
     (re.compile(r"(?i)bearer\s+[a-zA-Z0-9_\-\.]+"), "[REDACTED_TOKEN]"),
     (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[REDACTED_EMAIL]"),
     (re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"), "[REDACTED_CARD]"),
