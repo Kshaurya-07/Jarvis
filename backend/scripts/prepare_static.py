@@ -48,10 +48,18 @@ def prepare_static():
         shutil.copy2(src, dest)
         print(f"  Copied mobile asset: {dest.name}")
 
-    # Copy icons
+    # Copy icons. The mobile PWA manifest, index.html and service worker all
+    # reference icons/icon-192.png and icons/icon-512.png, and the service
+    # worker precaches them — if they are missing here the PWA install fails
+    # and the icons 404, so fail loudly instead of silently copying nothing.
     icons_src = mobile_dir / "icons"
     icons_dest = public_dir / "icons"
-    for icon in icons_src.glob("*.png"):
+    icons = sorted(icons_src.glob("*.png")) if icons_src.exists() else []
+    assert icons, (
+        f"Mobile PWA icons not found in {icons_src}: "
+        "expected icons/icon-192.png and icons/icon-512.png"
+    )
+    for icon in icons:
         shutil.copy2(icon, icons_dest / icon.name)
         print(f"  Copied icon: icons/{icon.name}")
 

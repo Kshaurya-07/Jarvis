@@ -33,3 +33,6 @@ backups/
 # IDE
 .vscode/
 .idea/
+
+# Vercel CLI
+.vercel/

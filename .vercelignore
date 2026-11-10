@@ -46,6 +46,7 @@ __pycache__/
 # 4. Backend Application Code & Local Server Configurations
 # The backend is built strictly for local loopback execution (127.0.0.1:8000).
 backend/app/
+backend/scripts/
 backend/requirements.txt
 pytest.ini
 .pytest_cache/

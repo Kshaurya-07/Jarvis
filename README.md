@@ -152,7 +152,9 @@ for fast startup; API calls always go to the live backend.
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Never commit a real `.env` — it is
+Copy `.env.example` to `.env` at the repo root. The backend reads that
+file even when started from `backend/`; a `.env` inside `backend/`
+overrides it if present. Never commit a real `.env` — it is
 gitignored. All settings have defaults in `backend/app/core/config.py`.
 
 | Variable | Default | Notes |
@@ -266,20 +268,20 @@ except `/health` and the pairing endpoints.
 
 | Endpoint | Description |
 | --- | --- |
-| `GET /health` | Health status. Returns status, version, and tool counts; no filesystem paths. |
+| `GET /health` | Health status. Returns status, version, config flags, reminder/memory counts, and the active tool list; no filesystem paths. |
 | `POST /api/chat` | Chat with Gemini tool calling. Body: `{"message": "..."}`. |
 | `GET /api/tools` | List the 26 registered tools. |
 | `GET /api/actions` | Audit log of recent actions (redacted). |
 | `GET /api/confirm/pending`, `POST /api/confirm` | List and approve/deny pending actions. |
 | `POST /api/extension/read-page` | Summarise text sent by the Chrome extension. |
-| `GET/POST/DELETE /api/reminders` | Manage reminders. Delete requires confirmation. |
-| `GET/POST/DELETE /api/memories` | Manage user-approved memories. |
+| `GET/POST/DELETE /api/reminders`, `PATCH /api/reminders/{id}/complete` | Manage reminders. Complete marks one done; delete requires confirmation. |
+| `GET/POST/DELETE /api/memories`, `GET /api/memories/status`, `POST /api/memories/toggle` | Manage user-approved memories; check or toggle memory on/off. |
 | `GET /api/briefing` | On-demand daily briefing. |
 | `GET /api/auth/google/url`, `GET /api/auth/google/callback`, `GET /api/auth/google/status`, `POST /api/auth/google/disconnect` | Google OAuth flow. |
 | `GET /api/gmail/messages`, `POST /api/gmail/summarize` | Read-only Gmail. |
 | `GET /api/calendar/events`, `POST /api/calendar/summarize` | Read-only Calendar. |
-| `GET/POST /api/browser/approved-domains`, `POST /api/browser/plan-action` | Browser automation allowlist and planning. |
-| `GET /api/data/locations`, `GET /api/data/export`, `POST /api/data/clear`, `GET/POST /api/data/backups`, `POST /api/data/restore` | Data export, wipe (confirmation-guarded), backup, restore. |
+| `GET /api/browser/approved-domains`, `POST /api/browser/approve-domain`, `POST /api/browser/plan-action` | Browser automation allowlist and planning. |
+| `GET /api/data/locations`, `GET /api/data/export`, `POST /api/data/clear`, `GET /api/data/backups`, `POST /api/data/backup`, `POST /api/data/restore` | Data export, wipe (confirmation-guarded), backup, restore. |
 | `GET /api/demo/status`, `POST /api/demo/seed`, `POST /api/demo/reset` | Demo data lifecycle. |
 | `POST /api/remote/pair/generate`, `POST /api/remote/pair/exchange`, `GET /api/remote/session/status`, `POST /api/remote/session/revoke`, `POST /api/remote/stop` | Remote pairing and control. |
 
@@ -295,8 +297,11 @@ curl -X POST http://127.0.0.1:8000/api/chat \
 ## Testing
 
 ```powershell
-.\.venv\Scripts\pytest -v
+.\.venv\Scripts\pytest backend/tests -q
 ```
+
+Run it from the repo root (the virtual environment lives there too).
+On macOS/Linux use `.venv/bin/pytest backend/tests -q`.
 
 **181 tests across 21 test files** (plus `conftest.py`). On Linux,
 159 pass and 22 Windows-only tests are skipped
@@ -306,7 +311,11 @@ security (path traversal, file-size caps, extension checks), DNS
 rebinding and referer defenses, rate limiting, Google OAuth, Gmail and
 Calendar read-only behaviour, search and briefing safeguards, remote
 authentication, and the demo flow. A Linux CI workflow is provided in
-`.github/workflows/ci.yml` (install, compile check, `pytest tests -q`).
+`.github/workflows/ci.yml` (install, compile check,
+`node --check frontend/landing/landing.js`,
+`python backend/scripts/prepare_static.py` with a check that the
+committed `frontend/public/` output is in sync, then
+`pytest backend/tests -q`).
 
 ## Security
 
@@ -346,7 +355,8 @@ authentication, and the demo flow. A Linux CI workflow is provided in
 The repo is split into two top-level folders: `frontend/` holds everything
 a browser loads, and `backend/` holds the local FastAPI server and its
 tests. The repo root stays small — `README.md`, `.env.example`,
-`.gitignore`, and `vercel.json` only (plus the usual `.github/` workflows).
+`.gitignore`, `.vercelignore`, and `vercel.json` only (plus the usual
+`.github/` workflows).
 
 ```
 Jarvis/
@@ -356,10 +366,14 @@ Jarvis/
 │   │   ├── landing.css
 │   │   └── landing.js
 │   ├── mobile/                  # Mobile PWA companion (/mobile/)
+│   │   └── icons/               # icon-192.png, icon-512.png (manifest + service worker)
 │   ├── demo/                    # Fictional local demo page (/demo/)
 │   ├── extension/               # Chrome extension, Manifest V3 (activeTab, scripting)
+│   │   └── icons/               # icon16.png, icon48.png, icon128.png (manifest.json)
 │   └── public/                  # Static build output for the hosted PWA
-│                                # (generated — run backend/scripts/prepare_static.py)
+│       ├── icons/               # copied from frontend/mobile/icons/
+│       └── landing/, demo/      # (generated — run backend/scripts/prepare_static.py;
+│                                #  the committed output must stay in sync, checked by CI)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # FastAPI app, origin/host validation, lifespan
@@ -379,6 +393,8 @@ Jarvis/
 │   │                            # frontend/demo/ and frontend/landing/
 │   └── requirements.txt         # Python dependencies
 ├── .env.example                 # Environment variable template (no real secrets)
+├── .gitignore
+├── .vercelignore
 └── vercel.json                  # Static hosting config (outputDirectory: frontend/public)
 ```
 

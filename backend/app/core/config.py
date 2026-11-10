@@ -3,6 +3,15 @@ from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# .env lives at the repo root, but the server runs from backend/ (where `app`
+# is a top-level package), so a plain env_file=".env" only loads when the
+# working directory happens to be the repo root. Anchor the repo-root .env to
+# this file's location so the documented `copy .env.example .env` flow works
+# from either directory; a .env in the working directory is read after it
+# and overrides it (pydantic-settings: later files win).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
 class ConfigurationError(Exception):
     """Raised when application configuration contains unsafe or fatal values."""
 
@@ -11,7 +20,7 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables and .env file."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(_REPO_ROOT / ".env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
