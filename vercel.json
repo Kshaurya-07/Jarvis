@@ -33,11 +33,11 @@
     },
     {
       "source": "/companion",
-      "destination": "/mobile/index.html"
+      "destination": "/mobile/"
     },
     {
       "source": "/companion/",
-      "destination": "/mobile/index.html"
+      "destination": "/mobile/"
     },
     {
       "source": "/landing",

@@ -308,8 +308,12 @@ def test_vercel_entrypoint_and_config():
     # Other rewrites must exist too: /companion and /companion/ serve the
     # Companion PWA, /landing and /demo serve their static pages.
     by_source = {r["source"]: r["destination"] for r in rewrites}
-    assert by_source["/companion"] == "/mobile/index.html"
-    assert by_source["/companion/"] == "/mobile/index.html"
+    # /companion is an alias for the Companion PWA: destination is the
+    # directory ("/mobile/"), not "/mobile/index.html" — with cleanUrls on,
+    # a rewrite to an .html file does not resolve live (both /companion and
+    # /companion/ 404'd while /mobile/ served 200).
+    assert by_source["/companion"] == "/mobile/"
+    assert by_source["/companion/"] == "/mobile/"
     assert by_source["/landing"] == "/landing/index.html"
     assert by_source["/demo"] == "/demo/index.html"
     # backend/app/ must be deployed: api/index.py does `from app.main import
