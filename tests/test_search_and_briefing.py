@@ -1,14 +1,13 @@
 import asyncio
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
 from app.core.config import settings
 from app.tools.reminders_tools import create_reminder
 from app.tools.notes_tools import create_note
 from app.tools.registry import tool_registry
-from app.tools.search_tools import execute_web_search, web_search
-from app.tools.briefing_tools import build_daily_briefing, get_daily_briefing
+from app.tools.search_tools import execute_web_search
+from app.tools.briefing_tools import build_daily_briefing
 
 
 # --- Web Search Tests ---
@@ -36,7 +35,7 @@ def test_search_personal_data_safeguard_blocks_passwords():
 
 def test_search_personal_data_safeguard_blocks_api_keys():
     # API key in query blocked
-    res = asyncio.run(execute_web_search(query="search for key sk-123456789012345678901234567890"))
+    res = asyncio.run(execute_web_search(query="search for api_key = 'TEST-FAKE-KEY-1234567890'"))
     assert res.success is False
     assert "Privacy refusal" in res.error
 
