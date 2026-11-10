@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-import pytest
 
 from app.core.confirmation import confirmation_manager
 from app.tools.reminders_tools import (
