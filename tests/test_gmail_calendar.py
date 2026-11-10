@@ -1,7 +1,5 @@
 import base64
-import json
 from unittest.mock import MagicMock, patch
-import pytest
 
 from app.core.config import settings
 from app.core.google_auth import google_auth_manager
