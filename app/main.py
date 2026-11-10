@@ -237,6 +237,11 @@ demo_dir = Path(__file__).resolve().parent.parent / "demo"
 if demo_dir.exists():
     app.mount("/demo", StaticFiles(directory=str(demo_dir), html=True), name="demo")
 
+# Vision landing page: static, no backend dependency
+landing_dir = Path(__file__).resolve().parent.parent / "landing"
+if landing_dir.exists():
+    app.mount("/landing", StaticFiles(directory=str(landing_dir), html=True), name="landing")
+
 
 @app.get("/demo", tags=["Demo"])
 async def demo_redirect():

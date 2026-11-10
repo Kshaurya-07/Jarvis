@@ -1,16 +1,44 @@
-# Jarvis — Personal AI Assistant
+# Jarvis — One companion. Every device.
 
-Jarvis is a local-first personal AI assistant. A FastAPI backend on your own
-laptop talks to Google Gemini, which can call 26 tools: read and search your
-files and notes, control approved Windows apps, take screenshots, manage
-reminders and memory, search the web, summarise read-only Gmail and Calendar,
-and automate low-risk browser actions on domains you approve. It ships with a
-Chrome extension (Manifest V3) and a mobile PWA companion, and it can be
-reached securely from your phone over your private Tailscale network.
+Jarvis is a personal AI companion designed to help across your paired devices —
+not just on one laptop. Give a command on your phone, your laptop, or your
+tablet, and choose where it should happen: from a phone, “Laptop par yeh file
+kholo aur summarize karo”; from a laptop, “Mere phone par reminder set karo”;
+from a tablet, “Laptop par yeh website kholo.” Jarvis understands the request,
+identifies the target device, explains what it plans to do, performs only the
+actions that are permitted, and reports the result back to you.
+
+That cross-device vision is the destination, not the starting point. Today,
+phone-to-laptop commands work when your phone is paired with your laptop over
+your private Tailscale network; the other directions are labelled honestly in
+the status table below and on the [vision landing page](landing/index.html).
+
+Under the hood, a FastAPI backend on your own laptop talks to Google Gemini,
+which can call 26 tools: read and search your files and notes, control
+approved Windows apps, take screenshots, manage reminders and memory, search
+the web, summarise read-only Gmail and Calendar, and automate low-risk browser
+actions on domains you approve. It ships with a Chrome extension
+(Manifest V3) and a mobile PWA companion.
 
 Local-first by design: the backend binds to `127.0.0.1` by default, all data
 lives on your laptop, and there is no telemetry, no background sync, and no
 cloud relay.
+
+## What works today — and what does not yet
+
+| Capability | Status | Notes |
+|---|---|---|
+| Phone → laptop commands (chat, tools, voice) | Available | Paired over Tailscale with a one-time 6-digit code. |
+| Voice input, editable transcript, spoken replies | Available | Browser speech recognition; raw audio stays on-device. |
+| Read-only Gmail & Calendar summaries | Requires permission | Google sign-in with read-only scopes. |
+| Choosing between several paired devices | In development | One laptop can be paired at a time today. |
+| Laptop → phone actions (e.g. reminders on your phone) | Planned | Needs a phone companion that can receive actions. |
+| Tablet as a command source | Planned | The companion web app opens in a tablet browser; a dedicated flow is planned. |
+| Wi-Fi, volume & brightness controls | Planned | Interfaces exist in `app/tools/future_interfaces.py`; the features are not implemented. |
+| Windows-only tools (app launch, screenshots, system status) | Available — Windows | On macOS/Linux these report “unsupported”. |
+
+Jarvis never submits forms, quizzes, exams, or purchases, and it never asks you
+to share passwords or API keys in chat.
 
 ## Features
 

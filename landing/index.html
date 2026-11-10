@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Jarvis is a personal AI companion that helps across your paired devices — give a command on one device and choose where it should happen. Local-first, permission-gated, and honest about what works today.">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>Jarvis — One companion. Every device.</title>
+  <link rel="stylesheet" href="landing.css">
+</head>
+<body>
+  <a class="skip-link" href="#companion">Skip to content</a>
+
+  <!-- 01 · Header -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="wordmark" href="#companion" aria-label="Jarvis — home">
+        <span class="orb" aria-hidden="true"></span>
+        <span class="wordmark-text">Jarvis</span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="#companion">Companion</a>
+        <a href="#devices">Devices</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#roadmap">Roadmap</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-ghost" href="/demo/">Study demo</a>
+        <a class="btn btn-primary" href="/">Open Companion</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 02 · Hero -->
+    <section class="hero" id="companion">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-num">01</span> · Companion</p>
+          <h1>One companion.<br>Every device.</h1>
+          <p class="lede">Jarvis is a personal AI companion that helps across your paired
+            devices — not just on one laptop. Give a command on your phone, your
+            laptop, or your tablet, and choose where it should happen.</p>
+          <p class="lede-secondary">Jarvis understands the request, picks the permitted
+            device, explains what it plans to do, does only what is allowed, and
+            reports the result back to you.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="/">Open Companion</a>
+            <a class="btn btn-ghost" href="#how">See how it works</a>
+          </div>
+          <div class="hero-status" role="status">
+            <span class="status-dot" id="backend-dot" aria-hidden="true"></span>
+            <span id="backend-status-text">Checking for a local Jarvis backend on this device…</span>
+          </div>
+          <p class="hero-note">No account needed to look around. The companion connects to
+            your laptop only after you pair it — nothing on this page is connected
+            by itself, and no telemetry is shown here.</p>
+        </div>
+
+        <div class="hero-visual" aria-label="Illustration: a luminous Jarvis core connected to a phone, a laptop and a tablet">
+          <!-- Original SVG artwork: orbital network motif, drawn for Jarvis. -->
+          <svg class="orbit-art" viewBox="0 0 560 520" role="img" aria-labelledby="orbit-title orbit-desc">
+            <title id="orbit-title">Jarvis core connected to your devices</title>
+            <desc id="orbit-desc">A glowing core in the centre, linked by orbital rings to a phone on the left, a laptop at the bottom, and a tablet on the right.</desc>
+            <defs>
+              <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#d9ccff" stop-opacity="0.9"/>
+                <stop offset="45%" stop-color="#a78bfa" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="linkGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#b7a6f5" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#b7a6f5" stop-opacity="0.25"/>
+              </linearGradient>
+            </defs>
+
+            <!-- orbital rings -->
+            <ellipse class="orbit-ring" cx="280" cy="260" rx="250" ry="150" fill="none" stroke="#b7a6f5" stroke-opacity="0.22" stroke-dasharray="3 7"/>
+            <ellipse class="orbit-ring orbit-ring-2" cx="280" cy="260" rx="190" ry="205" fill="none" stroke="#b7a6f5" stroke-opacity="0.16" stroke-dasharray="3 7"/>
+            <circle class="orbit-ring" cx="280" cy="260" r="118" fill="none" stroke="#b7a6f5" stroke-opacity="0.28"/>
+
+            <!-- links: core to devices -->
+            <line x1="280" y1="260" x2="92" y2="150" stroke="url(#linkGrad)" stroke-width="1.5"/>
+            <line x1="280" y1="260" x2="468" y2="150" stroke="url(#linkGrad)" stroke-width="1.5"/>
+            <line x1="280" y1="260" x2="280" y2="428" stroke="url(#linkGrad)" stroke-width="1.5"/>
+
+            <!-- core -->
+            <circle cx="280" cy="260" r="118" fill="url(#coreGlow)"/>
+            <circle class="core-pulse" cx="280" cy="260" r="52" fill="#17171b" stroke="#b7a6f5" stroke-width="1.5"/>
+            <circle cx="280" cy="260" r="26" fill="#b7a6f5" opacity="0.9"/>
+            <circle cx="280" cy="260" r="10" fill="#f5f1e8"/>
+            <text x="280" y="330" text-anchor="middle" class="art-label art-label-core">JARVIS CORE</text>
+
+            <!-- phone node -->
+            <g class="device-node">
+              <rect x="62" y="96" width="60" height="108" rx="10" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+              <rect x="70" y="110" width="44" height="72" rx="4" fill="#1c1c22"/>
+              <line x1="84" y1="192" x2="100" y2="192" stroke="#8f8b82" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="92" cy="146" r="9" fill="#b7a6f5" opacity="0.85"/>
+              <text x="92" y="228" text-anchor="middle" class="art-label">PHONE</text>
+              <text x="92" y="246" text-anchor="middle" class="art-sub">command</text>
+            </g>
+
+            <!-- tablet node -->
+            <g class="device-node">
+              <rect x="428" y="96" width="80" height="108" rx="10" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+              <rect x="438" y="108" width="60" height="76" rx="4" fill="#1c1c22"/>
+              <line x1="460" y1="194" x2="476" y2="194" stroke="#8f8b82" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="468" cy="146" r="9" fill="#b7a6f5" opacity="0.85"/>
+              <text x="468" y="228" text-anchor="middle" class="art-label">TABLET</text>
+              <text x="468" y="246" text-anchor="middle" class="art-sub">command</text>
+            </g>
+
+            <!-- laptop node -->
+            <g class="device-node">
+              <rect x="212" y="386" width="136" height="84" rx="8" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+              <rect x="224" y="398" width="112" height="52" rx="4" fill="#1c1c22"/>
+              <path d="M200 470 h160 l14 12 H186 Z" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+              <circle cx="280" cy="424" r="9" fill="#b7a6f5" opacity="0.85"/>
+              <text x="280" y="500" text-anchor="middle" class="art-label">LAPTOP</text>
+              <text x="280" y="518" text-anchor="middle" class="art-sub">where it happens</text>
+            </g>
+          </svg>
+          <p class="visual-caption">Your devices, one companion. The core runs on your laptop;
+            your phone and tablet reach it only through your private paired connection.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 · Device handoff -->
+    <section class="section" id="devices">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">02</span> · Devices</p>
+        <h2 class="reveal">Say it here. It happens there.</h2>
+        <p class="section-intro reveal">The long-term vision is simple: the device you speak to
+          does not have to be the device that does the work. Today, the phone-to-laptop
+          direction works when your phone is paired with your laptop. The other
+          directions are on the roadmap, and they are labelled honestly below.</p>
+
+        <div class="handoff-grid">
+          <article class="card handoff-card reveal">
+            <p class="card-kicker">Phone → Laptop</p>
+            <h3>“Laptop par yeh file kholo aur summarize karo.”</h3>
+            <ol class="handoff-steps">
+              <li><span class="step-device">Phone</span> You speak or type the command in the companion app.</li>
+              <li><span class="step-device">Jarvis</span> Reads the file — only inside your approved workspace — and explains the plan before acting.</li>
+              <li><span class="step-device">Laptop</span> The summary is prepared on your laptop and reported back to your phone.</li>
+            </ol>
+            <p class="status-line"><span class="badge badge-available">Available</span> Works today with a paired phone and laptop.</p>
+          </article>
+
+          <article class="card handoff-card reveal">
+            <p class="card-kicker">Laptop → Phone</p>
+            <h3>“Mere phone par reminder set karo.”</h3>
+            <ol class="handoff-steps">
+              <li><span class="step-device">Laptop</span> You ask Jarvis on your laptop to set a reminder on your phone.</li>
+              <li><span class="step-device">Jarvis</span> Would need a companion running on the phone that can receive actions — not just send them.</li>
+              <li><span class="step-device">Phone</span> The reminder would appear on your phone, with the same confirmation rules as on the laptop.</li>
+            </ol>
+            <p class="status-line"><span class="badge badge-planned">Planned</span> Reminders today are stored on the laptop only. Phone-side actions are not built yet.</p>
+          </article>
+        </div>
+
+        <p class="fine-print reveal">Every handoff depends on the target device being paired,
+          online, and permitted to do that action. If any of those is missing, Jarvis says
+          so instead of pretending it worked.</p>
+      </div>
+    </section>
+
+    <!-- 04 · How Jarvis works -->
+    <section class="section" id="how">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">03</span> · How it works</p>
+        <h2 class="reveal">Four steps. Nothing hidden.</h2>
+        <div class="steps-grid">
+          <article class="card step-card reveal">
+            <p class="step-num">01</p>
+            <h3>Understand the request</h3>
+            <p>Jarvis reads what you asked — typed or spoken — and works out what you want
+              and which device it belongs to. If the request is unclear, it asks instead of guessing.</p>
+          </article>
+          <article class="card step-card reveal">
+            <p class="step-num">02</p>
+            <h3>Choose a permitted device</h3>
+            <p>It checks which of your devices is paired, online, and allowed to do that
+              action. A device that is offline or not permitted is never used silently.</p>
+          </article>
+          <article class="card step-card reveal">
+            <p class="step-num">03</p>
+            <h3>Perform supported actions</h3>
+            <p>Only approved actions run, and anything that changes something asks for your
+              confirmation first. You can stop a running task at any time.</p>
+          </article>
+          <article class="card step-card reveal">
+            <p class="step-num">04</p>
+            <h3>Show the result</h3>
+            <p>The result comes back to the device you asked from, with a short record of
+              what was done in the activity history.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 · Capabilities -->
+    <section class="section" id="capabilities">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">04</span> · Capabilities</p>
+        <h2 class="reveal">What Jarvis can do — and what it can’t yet.</h2>
+        <p class="section-intro reveal">Every capability below is labelled with its real status in
+          the project today. “Available” means the code for it exists and is tested;
+          anything else is marked as it is.</p>
+
+        <div class="caps-grid">
+          <article class="card cap-card reveal">
+            <h3>Chat &amp; voice</h3>
+            <p>Gemini chat and natural question-answering, with push-to-talk voice commands,
+              an editable transcript, and optional spoken replies. Voice recognition runs
+              in your browser; raw audio is never sent to the server.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Paired devices</h3>
+            <p>Pair your phone with your laptop using a one-time 6-digit code. See connection
+              status, task progress, and activity history, and stop a running task. Today
+              one laptop can be paired at a time; choosing between several devices is next.</p>
+            <p><span class="badge badge-available">Available</span> <span class="badge badge-indev">Multi-device picker — In development</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Device help</h3>
+            <p>Launch apps from an approved allowlist and check laptop battery, storage, and
+              memory. Windows-only tools report “unsupported” on macOS and Linux instead of failing silently.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Screen &amp; browser help</h3>
+            <p>On your request, Jarvis can read the page you are on, summarise it, take a
+              screenshot, and help with practice questions for study. It never submits forms,
+              quizzes, exams, or purchases.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Files, notes &amp; memory</h3>
+            <p>Files are restricted to your approved workspace and notes folders. You control
+              what Jarvis remembers — memories are saved only when you approve them, and you
+              can delete any of them.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Reminders &amp; briefings</h3>
+            <p>Local reminders stored on your laptop, and an on-demand daily briefing that
+              summarises reminders, notes, and a web overview. Reminders on your phone are
+              planned, not available yet.</p>
+            <p><span class="badge badge-available">Available — laptop</span> <span class="badge badge-planned">Planned — phone</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Web search</h3>
+            <p>Search the web through official search APIs, with source links in the results.
+              Jarvis does not scrape websites, and it never sends credentials to a search provider.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Google, read-only</h3>
+            <p>Optional Gmail and Calendar summaries after you sign in with Google’s official
+              OAuth flow. Read-only: Jarvis cannot send mail, delete messages, or create or
+              edit events.</p>
+            <p><span class="badge badge-permission">Requires permission</span></p>
+          </article>
+
+          <article class="card cap-card reveal">
+            <h3>Your data, your control</h3>
+            <p>Export your data, delete it, or take a checksum-verified local backup — all
+              from your laptop, with a confirmation step before any deletion.</p>
+            <p><span class="badge badge-available">Available</span></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 · Interactive demo (simulated) -->
+    <section class="section" id="demo">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">05</span> · Demo</p>
+        <h2 class="reveal">Try a handoff — simulated.</h2>
+        <p class="section-intro reveal">This is a <strong>simulated demo</strong>. It runs
+          entirely in your browser and does not call the Jarvis backend, control any real
+          device, or use live AI. Pick a command and watch the steps Jarvis would take.</p>
+
+        <div class="demo-grid">
+          <div class="demo-phone card reveal">
+            <p class="demo-device-label">Phone · Companion app (simulated)</p>
+            <div class="demo-chips" role="group" aria-label="Choose a command">
+              <button class="chip-btn is-active" data-demo="file">“Laptop par yeh file kholo aur summarize karo.”</button>
+              <button class="chip-btn" data-demo="website">“Laptop par yeh website kholo.”</button>
+              <button class="chip-btn" data-demo="reminder">“Mere phone par reminder set karo.”</button>
+            </div>
+            <div class="demo-bubble" id="demo-command">“Laptop par yeh file kholo aur summarize karo.”</div>
+            <div class="demo-actions">
+              <button class="btn btn-primary" id="demo-run">Send to laptop</button>
+              <button class="btn btn-ghost" id="demo-reset">Reset</button>
+            </div>
+            <p class="demo-note" id="demo-note">Ready. Nothing has been sent anywhere.</p>
+          </div>
+
+          <div class="demo-laptop card reveal">
+            <p class="demo-device-label">Laptop · Jarvis (simulated)</p>
+            <ol class="demo-log" id="demo-log" aria-live="polite">
+              <li class="demo-log-empty">No command yet. Choose one and press “Send to laptop”.</li>
+            </ol>
+            <p class="demo-result" id="demo-result" hidden></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 · Privacy and control -->
+    <section class="section" id="privacy">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">06</span> · Privacy &amp; control</p>
+        <h2 class="reveal">Your laptop is the boundary.</h2>
+        <div class="privacy-grid">
+          <article class="card reveal">
+            <h3>Local by design</h3>
+            <p>The Jarvis backend runs on your own laptop and binds to localhost by default.
+              There is no cloud relay, no telemetry, and no background sync. Your phone
+              reaches it only over your private Tailscale network, after pairing.</p>
+          </article>
+          <article class="card reveal">
+            <h3>Permissions first</h3>
+            <p>Apps can only be launched from an allowlist, files only inside approved
+              folders, and browser actions only on domains you approve. Sensitive fields —
+              passwords, cards, tokens — are never read or filled.</p>
+          </article>
+          <article class="card reveal">
+            <h3>Confirmations</h3>
+            <p>Anything that changes something — opening an app, deleting a reminder,
+              clearing data — creates a one-time confirmation you approve or deny. You can
+              stop a running task at any time.</p>
+          </article>
+          <article class="card reveal">
+            <h3>What leaves your laptop</h3>
+            <p>Chat text and the content you ask to summarise are sent to Gemini; search
+              queries go to your chosen search provider; Gmail and Calendar data goes to
+              Gemini only when you ask for a summary, and only after you sign in with
+              Google. Passwords and API keys are never stored in memory or logs — and you
+              should never share them in chat.</p>
+          </article>
+          <article class="card reveal">
+            <h3>Logs you can read</h3>
+            <p>Every action Jarvis takes is written to an audit log on your laptop, with
+              secrets and file contents redacted. You can open it from the companion app
+              and export or delete your data at any time.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 · Roadmap -->
+    <section class="section" id="roadmap">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">07</span> · Roadmap</p>
+        <h2 class="reveal">Where Jarvis is going.</h2>
+        <p class="section-intro reveal">The cross-device vision is the destination, not the
+          starting point. This is what works now, what is being built, and what is still
+          planned — including the limits.</p>
+        <div class="roadmap-table-wrap reveal">
+          <table class="roadmap-table">
+            <thead>
+              <tr><th scope="col">Feature</th><th scope="col">Status</th><th scope="col">Notes</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Phone → laptop commands (chat, tools, voice)</td><td><span class="badge badge-available">Available</span></td><td>Paired over Tailscale with a one-time code.</td></tr>
+              <tr><td>Voice input, editable transcript, spoken replies</td><td><span class="badge badge-available">Available</span></td><td>Browser speech recognition; audio stays on-device.</td></tr>
+              <tr><td>Read-only Gmail &amp; Calendar summaries</td><td><span class="badge badge-permission">Requires permission</span></td><td>Google sign-in with read-only scopes.</td></tr>
+              <tr><td>Choosing between several paired devices</td><td><span class="badge badge-indev">In development</span></td><td>One laptop can be paired at a time today.</td></tr>
+              <tr><td>Laptop → phone actions (e.g. reminders on your phone)</td><td><span class="badge badge-planned">Planned</span></td><td>Needs a phone companion that can receive actions.</td></tr>
+              <tr><td>Tablet as a command source</td><td><span class="badge badge-planned">Planned</span></td><td>The companion web app opens in a tablet browser; a dedicated flow is planned.</td></tr>
+              <tr><td>Wi-Fi, volume &amp; brightness controls</td><td><span class="badge badge-planned">Planned</span></td><td>Interfaces exist in code; the features are not implemented.</td></tr>
+              <tr><td>Windows-only tools (app launch, screenshots, system status)</td><td><span class="badge badge-available">Available — Windows</span></td><td>On macOS/Linux these report “unsupported”.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine-print reveal">Jarvis will never claim a feature is ready until it is
+          implemented and tested. Anything marked Planned here is a direction, not a promise.</p>
+      </div>
+    </section>
+
+    <!-- 09 · Final CTA + footer -->
+    <section class="section cta-section">
+      <div class="wrap cta-box reveal">
+        <p class="eyebrow"><span class="eyebrow-num">08</span> · Start here</p>
+        <h2>Try Jarvis where it actually runs.</h2>
+        <p>The companion app is the real product. Open it, pair your phone with your
+          laptop, and give it a command — or explore the simulated study demo first.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="/">Open Companion</a>
+          <a class="btn btn-ghost" href="/demo/">Open study demo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div>
+        <p class="footer-wordmark"><span class="orb orb-small" aria-hidden="true"></span> Jarvis</p>
+        <p class="footer-tag">One companion. Every device.<br>Local-first, permission-gated, and honest about what works.</p>
+      </div>
+      <nav aria-label="Footer">
+        <p class="footer-col-title">Product</p>
+        <a href="/">Companion</a>
+        <a href="/demo/">Study demo</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#roadmap">Roadmap</a>
+      </nav>
+      <nav aria-label="Footer, about">
+        <p class="footer-col-title">About</p>
+        <a href="#devices">Devices</a>
+        <a href="#privacy">Privacy &amp; control</a>
+        <a href="https://github.com/Kshaurya-07/Jarvis">GitHub repository</a>
+      </nav>
+    </div>
+    <div class="wrap footer-bottom">
+      <p>Jarvis — a personal project. No account, no cloud relay, no telemetry.</p>
+      <p>All features described here reflect the code in the repository.</p>
+    </div>
+  </footer>
+
+  <script src="landing.js"></script>
+</body>
+</html>
