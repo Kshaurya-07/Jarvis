@@ -2,337 +2,728 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="description" content="Jarvis companion — one personal AI companion across your paired devices. Give a command on your phone and choose where it should happen.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Jarvis is a personal AI companion that helps across your paired devices — give a command on one device and choose where it should happen. Local-first, permission-gated, and honest about what works today.">
   <meta name="theme-color" content="#0a0a0c">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Jarvis Companion</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css">
+  <title>Jarvis — One companion. Every device.</title>
+  <link rel="stylesheet" href="landing.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Top Bar -->
-    <header class="app-header">
-      <div class="header-brand">
-        <span class="logo-orb" aria-hidden="true"></span>
-        <h1>Jarvis <span class="badge">Companion</span></h1>
-      </div>
+  <a class="skip-link" href="#companion">Skip to content</a>
+  <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursor-ring" aria-hidden="true"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="wordmark" href="#companion" aria-label="Jarvis — home">
+        <span class="orb" aria-hidden="true"></span>
+        <span class="wordmark-text">Jarvis</span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="#companion">Companion</a>
+        <a href="#how">How it works</a>
+        <a href="#demo">Demo</a>
+        <a href="#developers">Developers</a>
+        <a href="#privacy">Safety</a>
+        <a href="#access">Access</a>
+      </nav>
       <div class="header-actions">
-        <a href="/landing/" class="demo-pill" title="About Jarvis — vision, capabilities and roadmap" aria-label="About Jarvis">
-          <span>About Jarvis</span>
-        </a>
-        <button id="nav-demo-btn" class="demo-pill" title="Guided Demo" aria-label="Demo Guide">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <span>Demo Tour</span>
-        </button>
-        <div id="connection-pill" class="connection-pill checking" title="Connection Status">
-          <span class="status-dot"></span>
-          <span id="connection-text" class="status-text">Connecting...</span>
-        </div>
-        <button id="nav-actions-btn" class="icon-btn" title="View Recent Audit Logs" aria-label="Recent Actions">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </button>
-        <button id="nav-settings-btn" class="icon-btn" title="Settings & Privacy" aria-label="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        </button>
+        <a class="btn btn-ghost btn-small" href="/demo/">Study demo</a>
+        <a class="btn btn-primary btn-small" href="/mobile/">Open Companion</a>
       </div>
-    </header>
-
-    <!-- Network Architecture Notice Banner (Option B) -->
-    <div id="network-notice" class="network-notice" style="display: none;">
-      <div class="notice-content">
-        <svg class="notice-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <span id="network-notice-text">Jarvis runs on your laptop in Localhost-Only mode (Option B). Phone-to-laptop remote commands across different devices require private Tailscale pairing — one companion, every device, nothing in between.</span>
-        <button id="notice-pair-btn" class="notice-action-btn">Pair with Laptop</button>
-      </div>
-      <button id="close-notice-btn" class="notice-close" aria-label="Dismiss">&times;</button>
     </div>
+  </header>
 
-    <!-- Active Stop Bar (Visible when command in progress) -->
-    <div id="active-operation-bar" class="active-operation-bar" style="display: none;">
-      <div class="spinner-small" aria-hidden="true"></div>
-      <span id="active-op-label">Assistant is thinking & running tools...</span>
-      <button id="stop-btn" class="stop-control-btn" title="Abort in-flight operation">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        <span>Stop</span>
-      </button>
-    </div>
-
-    <!-- Speech Recording Indicator -->
-    <div id="recording-banner" class="recording-banner" style="display: none;">
-      <div class="recording-dot"></div>
-      <span class="recording-label">Listening... Speak now</span>
-      <button id="cancel-voice-btn" class="btn-cancel-voice">Cancel</button>
-    </div>
-
-    <!-- Main Chat & Assistant Response Area -->
-    <main id="chat-stream" class="chat-stream" role="log" aria-live="polite">
-      <!-- Welcome Message -->
-      <div class="message assistant-message welcome-card">
-        <div class="message-header">
-          <span class="sender-name">Jarvis Assistant</span>
-          <span class="timestamp">Ready</span>
+  <main>
+    <!-- Hero -->
+    <section class="hero" id="companion">
+      <div class="hero-wordmark" id="hero-wordmark" aria-hidden="true">Jarvis</div>
+      <div class="wrap hero-inner">
+        <div class="hero-side hero-index" aria-hidden="true">
+          <span>01</span><span class="hero-index-line"></span><span>Companion</span>
         </div>
-        <div class="message-body">
-          <p>Hello! I am Jarvis, your personal AI companion. Give me a command here, and choose where it should happen — on your laptop, from this phone.</p>
-          <ul class="quick-tips">
-            <li>Ask questions or summarize a file on your laptop</li>
-            <li>Query system status or notes</li>
-            <li>Manage reminders and memories</li>
-            <li>Search the web or get a daily briefing</li>
+
+        <div class="hero-centre">
+          <p class="hero-pill"><span class="pill-new">New</span> Phone → laptop handoff now works in the companion</p>
+          <h1>One companion.<br>Every device.</h1>
+          <p class="lede">Jarvis is a personal AI companion that helps across your paired
+            devices — not just on one laptop. Give a command on your phone, your
+            laptop, or your tablet, and choose where it should happen.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="/mobile/">Open Companion</a>
+            <a class="btn btn-ghost" href="#how">See how it works</a>
+          </div>
+
+          <div class="hero-visual" id="hero-visual" aria-label="Illustration: a luminous Jarvis core connected to a phone, a laptop and a tablet">
+            <div class="hero-glow" aria-hidden="true"></div>
+            <svg class="orbit-art" viewBox="0 0 560 520" role="img" aria-labelledby="orbit-title orbit-desc">
+              <title id="orbit-title">Jarvis core connected to your devices</title>
+              <desc id="orbit-desc">A glowing core in the centre, linked by orbital rings to a phone on the left, a laptop at the bottom, and a tablet on the right.</desc>
+              <defs>
+                <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#d9ccff" stop-opacity="0.9"/>
+                  <stop offset="45%" stop-color="#a78bfa" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="linkGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#b7a6f5" stop-opacity="0.9"/>
+                  <stop offset="100%" stop-color="#b7a6f5" stop-opacity="0.25"/>
+                </linearGradient>
+              </defs>
+              <g class="starfield" aria-hidden="true">
+                <circle cx="40" cy="60" r="1.6" fill="#f5f1e8"/><circle cx="120" cy="30" r="1.2" fill="#b7a6f5"/>
+                <circle cx="500" cy="50" r="1.6" fill="#f5f1e8"/><circle cx="540" cy="180" r="1.2" fill="#b7a6f5"/>
+                <circle cx="30" cy="300" r="1.2" fill="#b7a6f5"/><circle cx="530" cy="330" r="1.6" fill="#f5f1e8"/>
+                <circle cx="180" cy="480" r="1.2" fill="#f5f1e8"/><circle cx="420" cy="490" r="1.2" fill="#b7a6f5"/>
+                <circle cx="90" cy="420" r="1" fill="#f5f1e8"/><circle cx="470" cy="420" r="1" fill="#f5f1e8"/>
+              </g>
+              <ellipse class="orbit-ring" cx="280" cy="260" rx="250" ry="150" fill="none" stroke="#b7a6f5" stroke-opacity="0.22" stroke-dasharray="3 7"/>
+              <ellipse class="orbit-ring orbit-ring-2" cx="280" cy="260" rx="190" ry="205" fill="none" stroke="#b7a6f5" stroke-opacity="0.16" stroke-dasharray="3 7"/>
+              <circle class="orbit-ring" cx="280" cy="260" r="118" fill="none" stroke="#b7a6f5" stroke-opacity="0.28"/>
+              <line x1="280" y1="260" x2="92" y2="150" stroke="url(#linkGrad)" stroke-width="1.5"/>
+              <line x1="280" y1="260" x2="468" y2="150" stroke="url(#linkGrad)" stroke-width="1.5"/>
+              <line x1="280" y1="260" x2="280" y2="428" stroke="url(#linkGrad)" stroke-width="1.5"/>
+              <circle cx="280" cy="260" r="118" fill="url(#coreGlow)"/>
+              <circle class="core-pulse" cx="280" cy="260" r="52" fill="#17171b" stroke="#b7a6f5" stroke-width="1.5"/>
+              <circle cx="280" cy="260" r="26" fill="#b7a6f5" opacity="0.9"/>
+              <circle cx="280" cy="260" r="10" fill="#f5f1e8"/>
+              <text x="280" y="330" text-anchor="middle" class="art-label art-label-core">JARVIS CORE</text>
+              <g class="device-node">
+                <rect x="62" y="96" width="60" height="108" rx="10" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+                <rect x="70" y="110" width="44" height="72" rx="4" fill="#1c1c22"/>
+                <line x1="84" y1="192" x2="100" y2="192" stroke="#8f8b82" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="92" cy="146" r="9" fill="#b7a6f5" opacity="0.85"/>
+                <text x="92" y="228" text-anchor="middle" class="art-label">PHONE</text>
+                <text x="92" y="246" text-anchor="middle" class="art-sub">command</text>
+              </g>
+              <g class="device-node">
+                <rect x="428" y="96" width="80" height="108" rx="10" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+                <rect x="438" y="108" width="60" height="76" rx="4" fill="#1c1c22"/>
+                <line x1="460" y1="194" x2="476" y2="194" stroke="#8f8b82" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="468" cy="146" r="9" fill="#b7a6f5" opacity="0.85"/>
+                <text x="468" y="228" text-anchor="middle" class="art-label">TABLET</text>
+                <text x="468" y="246" text-anchor="middle" class="art-sub">command</text>
+              </g>
+              <g class="device-node">
+                <rect x="212" y="386" width="136" height="84" rx="8" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+                <rect x="224" y="398" width="112" height="52" rx="4" fill="#1c1c22"/>
+                <path d="M200 470 h160 l14 12 H186 Z" fill="#121215" stroke="#8f8b82" stroke-width="1.5"/>
+                <circle cx="280" cy="424" r="9" fill="#b7a6f5" opacity="0.85"/>
+                <text x="280" y="500" text-anchor="middle" class="art-label">LAPTOP</text>
+                <text x="280" y="518" text-anchor="middle" class="art-sub">where it happens</text>
+              </g>
+            </svg>
+            <div class="float-chip chip-phone" style="--depth:22"><span>Phone · command</span></div>
+            <div class="float-chip chip-tablet" style="--depth:16"><span>Tablet · command</span></div>
+            <div class="float-chip chip-laptop" style="--depth:26"><span>Laptop · where it happens</span></div>
+          </div>
+          <p class="visual-caption">Your devices, one companion. The core runs on your laptop;
+            your phone and tablet reach it only through your private paired connection.</p>
+        </div>
+
+        <aside class="hero-side hero-telemetry" aria-label="Live Jarvis status">
+          <p class="telemetry-title">Live status</p>
+          <div class="telemetry-row">
+            <span class="status-dot" id="backend-dot" aria-hidden="true"></span>
+            <span id="backend-status-text">Checking for a local Jarvis backend on this device…</span>
+          </div>
+          <dl class="telemetry-list">
+            <div><dt>Tools in the registry</dt><dd>26</dd></div>
+            <div><dt>Tests in the suite</dt><dd>181</dd></div>
+            <div><dt>Steps in every task</dt><dd>4</dd></div>
+            <div><dt>Cloud relay</dt><dd>None</dd></div>
+          </dl>
+          <p class="telemetry-note">Counts are from the Jarvis code in this repository.
+            No telemetry is collected or shown here.</p>
+        </aside>
+      </div>
+      <div class="hero-bottom wrap">
+        <p class="hero-release">Local-first · No account needed to look around</p>
+        <a class="scroll-hint" href="#works-with">Scroll <span aria-hidden="true">↓</span></a>
+      </div>
+    </section>
+
+    <!-- Works with (honest integrations strip, replaces a customers marquee) -->
+    <section class="marquee-section" id="works-with" aria-label="Works with">
+      <p class="marquee-label">Works with — integrations Jarvis actually uses</p>
+      <div class="marquee" aria-hidden="false">
+        <div class="marquee-track">
+          <span>Gemini</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Tailscale</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Google — read-only</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Web Speech</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>FastAPI</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Python</span><span class="marquee-dot" aria-hidden="true">·</span>
+        </div>
+        <div class="marquee-track" aria-hidden="true">
+          <span>Gemini</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Tailscale</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Google — read-only</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Web Speech</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>FastAPI</span><span class="marquee-dot" aria-hidden="true">·</span>
+          <span>Python</span><span class="marquee-dot" aria-hidden="true">·</span>
+        </div>
+      </div>
+      <p class="marquee-note">These are the services and libraries Jarvis is built on.
+        Jarvis has no customers to list, so there are none here.</p>
+    </section>
+
+    <!-- 01 · Why Jarvis exists -->
+    <section class="section statement" id="why">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">01</span> · Why Jarvis exists</p>
+        <p class="statement-text reveal">The device you speak to should not have to be the device
+          that does the work. Jarvis understands the request, picks the permitted
+          device, explains what it plans to do, does only what is allowed — and
+          says so plainly when something is not built yet.</p>
+        <div class="stats-grid">
+          <div class="stat reveal">
+            <p class="stat-num"><span class="count-up" data-count="26">26</span></p>
+            <p class="stat-label">Tools in the registry — files, reminders, memory, search, browser, device status and read-only Google</p>
+          </div>
+          <div class="stat reveal">
+            <p class="stat-num"><span class="count-up" data-count="181">181</span></p>
+            <p class="stat-label">Tests in the suite — 159 passed, 22 skipped on platforms they do not apply to</p>
+          </div>
+          <div class="stat reveal">
+            <p class="stat-num"><span class="count-up" data-count="4">4</span></p>
+            <p class="stat-label">Steps in every task — understand, choose a permitted device, act, report back</p>
+          </div>
+          <div class="stat reveal">
+            <p class="stat-num"><span class="count-up" data-count="5">5</span></p>
+            <p class="stat-label">Apps on the launch allowlist — Notepad, Calculator, Paint, File Explorer and Command Prompt</p>
+          </div>
+        </div>
+        <p class="fine-print reveal">Every number above is counted from the code in the
+          <a href="https://github.com/Kshaurya-07/Jarvis">Jarvis repository</a> — the tool
+          registry, the test suite, the four-step flow and the app allowlist.</p>
+      </div>
+    </section>
+
+    <!-- 02 · How it works (sticky) -->
+    <section class="section how-section" id="how">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">02</span> · How it works</p>
+        <h2 class="reveal">What happens after you press enter.</h2>
+        <div class="how-grid">
+          <div class="how-steps">
+            <article class="how-step reveal is-active" data-step="0">
+              <p class="how-figure">01</p>
+              <h3>Understand the request</h3>
+              <p>Jarvis reads what you asked — typed or spoken — and works out what you want
+                and which device it belongs to. If the request is unclear, it asks instead of guessing.</p>
+              <p class="how-path"><span class="path-tag">Check</span> Is the target clear? If not, ask — never guess.</p>
+            </article>
+            <article class="how-step reveal" data-step="1">
+              <p class="how-figure">02</p>
+              <h3>Choose a permitted device</h3>
+              <p>It checks which of your devices is paired, online, and allowed to do that
+                action. A device that is offline or not permitted is never used silently.</p>
+              <p class="how-path"><span class="path-tag">Check</span> Paired, online and permitted? If not, say so.</p>
+            </article>
+            <article class="how-step reveal" data-step="2">
+              <p class="how-figure">03</p>
+              <h3>Perform supported actions</h3>
+              <p>Only approved actions run, and anything that changes something asks for your
+                confirmation first. You can stop a running task at any time.</p>
+              <p class="how-path"><span class="path-tag">Retry</span> A failed step goes back one step — or stops and reports.</p>
+            </article>
+            <article class="how-step reveal" data-step="3">
+              <p class="how-figure">04</p>
+              <h3>Show the result</h3>
+              <p>The result comes back to the device you asked from, with a short record of
+                what was done in the activity history.</p>
+              <p class="how-path"><span class="path-tag">Check</span> Result reported, action logged. Nothing hidden.</p>
+            </article>
+          </div>
+
+          <div class="how-diagram" aria-hidden="true">
+            <div class="how-diagram-sticky">
+              <svg class="orbit-diagram" viewBox="0 0 360 360" role="img" aria-label="Orbital diagram of the four steps">
+                <circle cx="180" cy="180" r="150" fill="none" stroke="#b7a6f5" stroke-opacity="0.2" stroke-dasharray="3 7"/>
+                <circle cx="180" cy="180" r="105" fill="none" stroke="#b7a6f5" stroke-opacity="0.25"/>
+                <circle cx="180" cy="180" r="58" fill="none" stroke="#b7a6f5" stroke-opacity="0.3"/>
+                <path class="orbit-path" d="M180 30 A150 150 0 0 1 330 180" fill="none" stroke="#b7a6f5" stroke-width="2" stroke-opacity="0.7"/>
+                <circle cx="180" cy="180" r="26" fill="#b7a6f5" opacity="0.9"/>
+                <circle cx="180" cy="180" r="10" fill="#f5f1e8"/>
+                <g class="orbit-node" data-node="0"><circle cx="180" cy="30" r="14" fill="#121215" stroke="#b7a6f5" stroke-width="1.5"/><text x="180" y="34" text-anchor="middle">1</text></g>
+                <g class="orbit-node" data-node="1"><circle cx="330" cy="180" r="14" fill="#121215" stroke="#b7a6f5" stroke-width="1.5"/><text x="330" y="184" text-anchor="middle">2</text></g>
+                <g class="orbit-node" data-node="2"><circle cx="180" cy="330" r="14" fill="#121215" stroke="#b7a6f5" stroke-width="1.5"/><text x="180" y="334" text-anchor="middle">3</text></g>
+                <g class="orbit-node" data-node="3"><circle cx="30" cy="180" r="14" fill="#121215" stroke="#b7a6f5" stroke-width="1.5"/><text x="30" y="184" text-anchor="middle">4</text></g>
+              </svg>
+              <p class="how-diagram-caption" id="how-diagram-caption">Step 1 of 4 — Understand the request</p>
+              <p class="how-diagram-note">Check at every step. Retry goes back one step; a step that cannot pass stops and reports instead of guessing.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 · Capabilities, compared honestly -->
+    <section class="section" id="compare">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">03</span> · Capabilities</p>
+        <h2 class="reveal">Measured against the code, not claimed.</h2>
+        <p class="section-intro reveal">Every row below is labelled with its real status in the
+          project today. “Available” means the code for it exists and is tested;
+          anything else is marked as it is. No invented benchmarks.</p>
+
+        <div class="tabs reveal" role="tablist" aria-label="Compare capabilities">
+          <button class="tab-btn is-active" role="tab" aria-selected="true" aria-controls="tab-phone" id="tabbtn-phone" data-tab="tab-phone">Phone → Laptop</button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-laptop" id="tabbtn-laptop" data-tab="tab-laptop">Laptop → Phone</button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-now" id="tabbtn-now" data-tab="tab-now">Available now</button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-planned" id="tabbtn-planned" data-tab="tab-planned">Planned</button>
+        </div>
+
+        <div class="tab-panel is-active" id="tab-phone" role="tabpanel" aria-labelledby="tabbtn-phone">
+          <p class="tab-intro">Commands sent from your phone, done on your paired laptop. Works today over Tailscale with a one-time 6-digit pairing code.</p>
+          <ul class="compare-rows">
+            <li><div class="compare-row-head"><span>Chat, voice commands &amp; spoken replies</span><span class="badge badge-available">Available</span></div><p class="bar-label">Companion-app feature, not a registered tool · browser speech recognition, audio stays on-device</p></li>
+            <li><div class="compare-row-head"><span>Files, notes &amp; memory</span><span class="badge badge-available">Available</span></div><div class="bar" style="--w:100%"><span></span></div><p class="bar-label">7 tools — list &amp; read files, create &amp; search notes, remember, forget, list memories</p></li>
+            <li><div class="compare-row-head"><span>Reminders on the laptop</span><span class="badge badge-available">Available</span></div><div class="bar" style="--w:57%"><span></span></div><p class="bar-label">4 tools — create, list, complete, delete, stored on the laptop only</p></li>
+            <li><div class="compare-row-head"><span>Device &amp; screen help</span><span class="badge badge-available">Available — Windows</span></div><div class="bar" style="--w:86%"><span></span></div><p class="bar-label">6 tools — app launch, battery, storage, memory, screenshots; “unsupported” on macOS / Linux</p></li>
+            <li><div class="compare-row-head"><span>Read-only Gmail &amp; Calendar summaries</span><span class="badge badge-permission">Requires permission</span></div><div class="bar" style="--w:57%"><span></span></div><p class="bar-label">4 tools — Google sign-in with read-only scopes; Jarvis cannot send mail or edit events</p></li>
           </ul>
         </div>
+
+        <div class="tab-panel" id="tab-laptop" role="tabpanel" aria-labelledby="tabbtn-laptop" hidden>
+          <p class="tab-intro">Commands from your laptop that act on your phone. This is the direction still being built — Jarvis says so instead of pretending it worked.</p>
+          <ul class="compare-rows">
+            <li><div class="compare-row-head"><span>Reminders on your phone</span><span class="badge badge-planned">Planned</span></div><div class="bar bar-planned" style="--w:0%"><span></span></div><p class="bar-label">Needs a phone companion that can receive actions, not just send them</p></li>
+            <li><div class="compare-row-head"><span>Phone notifications &amp; controls</span><span class="badge badge-planned">Planned</span></div><div class="bar bar-planned" style="--w:0%"><span></span></div><p class="bar-label">No phone-side action receiver exists yet</p></li>
+            <li><div class="compare-row-head"><span>Choosing between several paired devices</span><span class="badge badge-indev">In development</span></div><div class="bar bar-indev" style="--w:38%"><span></span></div><p class="bar-label">One laptop can be paired at a time today; the multi-device picker is next</p></li>
+          </ul>
+        </div>
+
+        <div class="tab-panel" id="tab-now" role="tabpanel" aria-labelledby="tabbtn-now" hidden>
+          <p class="tab-intro">Everything below exists in code and is tested. Bars show how many of the 26 registered tools belong to each group.</p>
+          <ul class="compare-rows">
+            <li><div class="compare-row-head"><span>Device &amp; screen</span><span class="badge badge-available">6 tools</span></div><div class="bar" style="--w:100%"><span></span></div><p class="bar-label">App launch, battery, storage, memory, screenshot capture &amp; analysis</p></li>
+            <li><div class="compare-row-head"><span>Files &amp; notes</span><span class="badge badge-available">4 tools</span></div><div class="bar" style="--w:67%"><span></span></div><p class="bar-label">List &amp; read files, create &amp; search notes</p></li>
+            <li><div class="compare-row-head"><span>Reminders</span><span class="badge badge-available">4 tools</span></div><div class="bar" style="--w:67%"><span></span></div><p class="bar-label">Create, list, complete, delete — laptop only</p></li>
+            <li><div class="compare-row-head"><span>Google, read-only</span><span class="badge badge-available">4 tools</span></div><div class="bar" style="--w:67%"><span></span></div><p class="bar-label">List &amp; summarise Gmail, list &amp; summarise Calendar events</p></li>
+            <li><div class="compare-row-head"><span>Memory</span><span class="badge badge-available">3 tools</span></div><div class="bar" style="--w:50%"><span></span></div><p class="bar-label">Remember, forget, list — only when you approve</p></li>
+            <li><div class="compare-row-head"><span>Browser</span><span class="badge badge-available">3 tools</span></div><div class="bar" style="--w:50%"><span></span></div><p class="bar-label">Navigate, read page, fill a non-sensitive field — approved domains only</p></li>
+            <li><div class="compare-row-head"><span>Search &amp; briefing</span><span class="badge badge-available">2 tools</span></div><div class="bar" style="--w:33%"><span></span></div><p class="bar-label">Web search and the on-demand daily briefing</p></li>
+          </ul>
+        </div>
+
+        <div class="tab-panel" id="tab-planned" role="tabpanel" aria-labelledby="tabbtn-planned" hidden>
+          <p class="tab-intro">Directions, not promises. Nothing here is claimed as ready until it is implemented and tested.</p>
+          <ul class="compare-rows">
+            <li><div class="compare-row-head"><span>Laptop → phone actions</span><span class="badge badge-planned">Planned</span></div><div class="bar bar-planned" style="--w:0%"><span></span></div><p class="bar-label">Reminders and actions on the phone from the laptop</p></li>
+            <li><div class="compare-row-head"><span>Tablet as a command source</span><span class="badge badge-planned">Planned</span></div><div class="bar bar-planned" style="--w:0%"><span></span></div><p class="bar-label">The companion web app opens in a tablet browser; a dedicated flow is planned</p></li>
+            <li><div class="compare-row-head"><span>Wi-Fi, volume &amp; brightness controls</span><span class="badge badge-planned">Planned</span></div><div class="bar bar-planned" style="--w:0%"><span></span></div><p class="bar-label">Interfaces exist in code; the features are not implemented</p></li>
+            <li><div class="compare-row-head"><span>Multi-device picker</span><span class="badge badge-indev">In development</span></div><div class="bar bar-indev" style="--w:38%"><span></span></div><p class="bar-label">Choosing between several paired devices</p></li>
+          </ul>
+        </div>
+
+        <p class="fine-print reveal">Bars are scaled to the largest row in their tab and labelled
+          with real counts from the tool registry. Planned rows have no bar —
+          there is nothing to measure yet.</p>
       </div>
-    </main>
+    </section>
 
-    <!-- Bottom Command Input Bar -->
-    <footer class="app-footer">
-      <div class="input-row">
-        <!-- Push-to-Talk Voice Button -->
-        <button id="voice-btn" class="touch-btn voice-btn" title="Push to talk (hold or tap to record)" aria-label="Voice input">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </button>
+    <!-- 04 · Live demo (simulated) -->
+    <section class="section" id="demo">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">04</span> · Live demo</p>
+        <h2 class="reveal">Watch it think — simulated.</h2>
+        <p class="section-intro reveal">This is a <strong>simulated demo</strong>. It runs
+          entirely in your browser and does not call the Jarvis backend, control any real
+          device, or use live AI. Pick a command and watch the steps Jarvis would take.</p>
 
-        <!-- Command Input Textarea -->
-        <div class="input-field-wrapper">
-          <textarea
-            id="command-input"
-            class="command-input"
-            placeholder="Type a command or question..."
-            rows="1"
-            maxlength="4096"
-            aria-label="Command Input"
-          ></textarea>
+        <div class="tabs demo-tabs reveal" role="tablist" aria-label="Demo command">
+          <button class="tab-btn is-active" role="tab" aria-selected="true" data-demo="file">File</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-demo="website">Website</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-demo="reminder">Reminder</button>
         </div>
 
-        <!-- Touch-Friendly Send Button -->
-        <button id="send-btn" class="touch-btn send-btn" title="Send Command" aria-label="Send">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+        <div class="demo-grid">
+          <div class="demo-phone card reveal">
+            <p class="demo-device-label">Phone · Companion app (simulated)</p>
+            <div class="demo-bubble" id="demo-command">“Laptop par yeh file kholo aur summarize karo.”</div>
+            <div class="demo-actions">
+              <button class="btn btn-primary" id="demo-run">Send to laptop</button>
+              <button class="btn btn-ghost" id="demo-rerun">Run again</button>
+              <button class="btn btn-ghost" id="demo-reset">Reset</button>
+            </div>
+            <p class="demo-note" id="demo-note">Ready. Nothing has been sent anywhere.</p>
+            <div class="branch-map">
+              <p class="demo-device-label">Branch map — simulated</p>
+              <svg viewBox="0 0 420 150" role="img" aria-label="Branch map: three paths, one kept, the others dropped">
+                <line x1="20" y1="75" x2="120" y2="30" stroke="#b7a6f5" stroke-opacity="0.4"/>
+                <line x1="20" y1="75" x2="120" y2="75" stroke="#b7a6f5" stroke-opacity="0.4"/>
+                <line x1="20" y1="75" x2="120" y2="120" stroke="#b7a6f5" stroke-opacity="0.4"/>
+                <circle cx="20" cy="75" r="8" fill="#b7a6f5"/>
+                <g class="branch" data-branch="file"><circle cx="130" cy="30" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="34" text-anchor="middle">A</text><text x="160" y="26" class="branch-label">Read file</text><text x="160" y="42" class="branch-sub">keep</text></g>
+                <g class="branch" data-branch="website"><circle cx="130" cy="75" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="79" text-anchor="middle">B</text><text x="160" y="71" class="branch-label">Check domain</text><text x="160" y="87" class="branch-sub">keep</text></g>
+                <g class="branch" data-branch="reminder"><circle cx="130" cy="120" r="16" fill="#121215" stroke="#b7a6f5"/><text x="130" y="124" text-anchor="middle">C</text><text x="160" y="116" class="branch-label">Phone action</text><text x="160" y="132" class="branch-sub">not built yet</text></g>
+                <path class="branch-check" data-branch="file" d="M250 22 l6 6 l10 -12" fill="none" stroke="#7ddba3" stroke-width="2"/>
+                <path class="branch-check" data-branch="website" d="M250 67 l6 6 l10 -12" fill="none" stroke="#7ddba3" stroke-width="2"/>
+                <path class="branch-check" data-branch="reminder" d="M246 112 l14 14 M260 112 l-14 14" fill="none" stroke="#e8c87a" stroke-width="2"/>
+              </svg>
+              <p class="branch-note" id="branch-note">Branch A — reading a file inside the approved workspace.</p>
+            </div>
+          </div>
+
+          <div class="demo-laptop card reveal">
+            <p class="demo-device-label">Laptop · Jarvis (simulated) · <span class="sim-tag">Simulated demo</span></p>
+            <ol class="demo-log" id="demo-log" aria-live="polite">
+              <li class="demo-log-empty">No command yet. Choose one and press “Send to laptop”.</li>
+            </ol>
+            <p class="demo-result" id="demo-result" hidden></p>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <!-- Quick Command Chips -->
-      <div class="quick-chips-scroll">
-        <button class="chip" data-cmd="What is the system status?">System Status</button>
-        <button class="chip" data-cmd="Give me my daily briefing.">Daily Briefing</button>
-        <button class="chip" data-cmd="List my upcoming reminders.">Reminders</button>
-        <button class="chip" data-cmd="List my recent notes.">Recent Notes</button>
-        <button class="chip" data-cmd="Show my demo notes.">Demo Notes</button>
-        <button class="chip" data-cmd="Show my most recent note and summarize it.">Summarize Latest Note</button>
-        <button class="chip" data-cmd="What is the launch date of the Europa Deep Horizon mission?">Europa Demo Query</button>
+    <!-- 05 · Tools by category (real registry counts) -->
+    <section class="section" id="tools-chart">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">05</span> · Tools by category</p>
+        <h2 class="reveal">Twenty-six tools, counted from the registry.</h2>
+        <p class="section-intro reveal">The lower line is how many tools each category adds;
+          the upper line is the running total. Both come from
+          <code>app/tools/registry.py</code> — nothing here is measured from a benchmark.</p>
+        <div class="chart-wrap card reveal">
+          <div class="chart-svg-wrap">
+          <svg class="chart" id="tools-chart-svg" viewBox="0 0 720 340" role="img" aria-labelledby="chart-title chart-desc">
+            <title id="chart-title">Tools per category and running total</title>
+            <desc id="chart-desc">Line chart: tools per category (4, 6, 4, 3, 2, 4, 3) and cumulative total rising to 26.</desc>
+            <g class="chart-grid" stroke="#f5f1e8" stroke-opacity="0.08">
+              <line x1="60" y1="280" x2="680" y2="280"/><line x1="60" y1="160" x2="680" y2="160"/><line x1="60" y1="40" x2="680" y2="40"/>
+            </g>
+            <g class="chart-axis" font-family="ui-monospace, monospace" font-size="11" fill="#6f6d66">
+              <text x="52" y="284" text-anchor="end">0</text><text x="52" y="164" text-anchor="end">13</text><text x="52" y="44" text-anchor="end">26</text>
+              <text x="60" y="308" text-anchor="middle">Files &amp; notes</text>
+              <text x="163" y="308" text-anchor="middle">Device &amp; screen</text>
+              <text x="267" y="308" text-anchor="middle">Reminders</text>
+              <text x="370" y="308" text-anchor="middle">Memory</text>
+              <text x="473" y="308" text-anchor="middle">Search &amp; briefing</text>
+              <text x="577" y="308" text-anchor="middle">Google (read-only)</text>
+              <text x="680" y="308" text-anchor="middle">Browser</text>
+              <text x="60" y="332" text-anchor="middle" fill="#a09d94">tools per category →</text>
+            </g>
+            <path class="chart-line chart-line-cum" d="M60.0,243.1 L163.3,187.7 L266.7,150.8 L370.0,123.1 L473.3,104.6 L576.7,67.7 L680.0,40.0" fill="none" stroke="#f5f1e8" stroke-width="2"/>
+            <path class="chart-line chart-line-cat" d="M60.0,243.1 L163.3,224.6 L266.7,243.1 L370.0,252.3 L473.3,261.5 L576.7,243.1 L680.0,252.3" fill="none" stroke="#b7a6f5" stroke-width="2"/>
+            <g class="chart-dots" fill="#b7a6f5">
+              <circle cx="60" cy="243.1" r="4"/><circle cx="163.3" cy="224.6" r="4"/><circle cx="266.7" cy="243.1" r="4"/><circle cx="370" cy="252.3" r="4"/><circle cx="473.3" cy="261.5" r="4"/><circle cx="576.7" cy="243.1" r="4"/><circle cx="680" cy="252.3" r="4"/>
+            </g>
+            <g class="chart-dots-cum" fill="#f5f1e8">
+              <circle cx="60" cy="243.1" r="3"/><circle cx="163.3" cy="187.7" r="3"/><circle cx="266.7" cy="150.8" r="3"/><circle cx="370" cy="123.1" r="3"/><circle cx="473.3" cy="104.6" r="3"/><circle cx="576.7" cy="67.7" r="3"/><circle cx="680" cy="40" r="3"/>
+            </g>
+            <g id="chart-tooltip-anchor"><circle id="chart-cursor" cx="60" cy="243.1" r="6" fill="none" stroke="#b7a6f5" stroke-width="2" opacity="0"/></g>
+          </svg>
+          <div class="chart-tooltip" id="chart-tooltip" hidden></div>
+          </div>
+          <div class="chart-legend">
+            <span><i class="legend-swatch legend-cat"></i> Tools in this category</span>
+            <span><i class="legend-swatch legend-cum"></i> Running total (ends at 26)</span>
+          </div>
+          <table class="chart-table">
+            <caption>Tools per category — the same data as the chart</caption>
+            <thead><tr><th scope="col">Category</th><th scope="col">Tools</th><th scope="col">Running total</th></tr></thead>
+            <tbody>
+              <tr><td>Files &amp; notes</td><td>4</td><td>4</td></tr>
+              <tr><td>Device &amp; screen</td><td>6</td><td>10</td></tr>
+              <tr><td>Reminders</td><td>4</td><td>14</td></tr>
+              <tr><td>Memory</td><td>3</td><td>17</td></tr>
+              <tr><td>Search &amp; briefing</td><td>2</td><td>19</td></tr>
+              <tr><td>Google (read-only)</td><td>4</td><td>23</td></tr>
+              <tr><td>Browser</td><td>3</td><td>26</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </footer>
-  </div>
+    </section>
 
-  <!-- Recent Actions Drawer (Audit Logs Feed) -->
-  <aside id="actions-drawer" class="drawer" aria-hidden="true">
-    <div class="drawer-header">
-      <h2>Recent Audit Actions</h2>
-      <div class="drawer-actions">
-        <button id="refresh-actions-btn" class="icon-btn-small" title="Refresh Actions" aria-label="Refresh">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </button>
-        <button id="close-actions-btn" class="drawer-close" aria-label="Close Drawer">&times;</button>
+    <!-- 06 · For developers -->
+    <section class="section" id="developers">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">06</span> · For developers</p>
+        <h2 class="reveal">One backend, on your laptop.</h2>
+        <p class="section-intro reveal">The Jarvis backend is a FastAPI app that runs locally.
+          No hosted API, no API keys to buy — start it on your laptop and talk to it
+          from the same machine. The numbers below are the only ones we can verify.</p>
+        <div class="stats-grid dev-stats">
+          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="26">26</span></p><p class="stat-label">Registered tools, listed at GET /api/tools</p></div>
+          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="181">181</span></p><p class="stat-label">Tests in the suite — 159 passed, 22 skipped</p></div>
+          <div class="stat reveal"><p class="stat-num"><span class="count-up" data-count="43">43</span></p><p class="stat-label">API routes in the backend, 39 of them behind a remote session</p></div>
+          <div class="stat reveal"><p class="stat-num">Local</p><p class="stat-label">Backend binds to localhost by default — no cloud relay, no uptime claim to make</p></div>
+        </div>
+
+        <div class="dev-grid">
+          <div class="code-window card reveal">
+            <div class="code-head">
+              <div class="tabs code-tabs" role="tablist" aria-label="Code example language">
+                <button class="tab-btn is-active" role="tab" aria-selected="true" data-code="curl">cURL</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-code="python">Python</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-code="typescript">TypeScript</button>
+              </div>
+              <button class="btn btn-ghost btn-small" id="copy-code">Copy code</button>
+            </div>
+            <pre class="code-body" id="code-body" aria-live="polite"><code id="code-text"></code><span class="code-cursor" aria-hidden="true"></span></pre>
+            <p class="code-note" id="copy-note">Health check against the backend on your own laptop. No key needed for /api/health.</p>
+          </div>
+
+          <div class="stream-window card reveal">
+            <p class="demo-device-label">Stream · <span class="sim-tag">Simulated stream</span></p>
+            <ol class="stream-log" id="stream-log" aria-live="polite">
+              <li class="stream-empty">The stream plays when this section comes into view. It is a scripted preview, not a live backend call.</li>
+            </ol>
+            <button class="btn btn-ghost btn-small" id="stream-replay">Replay stream</button>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="drawer-content">
-      <p class="drawer-desc">Audit trail of tools executed by the assistant. Secrets, passwords, and file contents are never stored in logs.</p>
-      <div id="actions-list" class="actions-list">
-        <div class="actions-empty">No recent actions logged yet.</div>
+    </section>
+
+    <!-- 07 · Safety -->
+    <section class="section" id="privacy">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">07</span> · Safety</p>
+        <h2 class="reveal">Built to say when it can’t — and to prove what it did.</h2>
+        <p class="section-intro reveal">Your laptop is the boundary. Everything Jarvis can do
+          is gated by an allowlist, a confirmation, or a permission — and everything it
+          does is written to a log you can read.</p>
+        <div class="safety-grid">
+          <article class="card safety-card reveal">
+            <p class="safety-num"><span class="count-up" data-count="39">39</span><span class="safety-num-suffix"> / 43</span></p>
+            <h3>Endpoints behind a remote session</h3>
+            <p>39 of the backend’s 43 API routes require a remote session for requests that
+              come from another device. Local requests from the laptop itself are the exception.</p>
+          </article>
+          <article class="card safety-card reveal">
+            <p class="safety-num"><span class="count-up" data-count="128">128</span><span class="safety-num-suffix">-bit</span></p>
+            <h3>Confirmation IDs</h3>
+            <p>Every state-changing action creates a one-time confirmation ID from 16 random
+              bytes — 128 bits — that you approve or deny. Without it, the action does not run.</p>
+          </article>
+          <article class="card safety-card reveal">
+            <p class="safety-num"><span class="count-up" data-count="5">5</span></p>
+            <h3>Apps on the launch allowlist</h3>
+            <p>Only Notepad, Calculator, Paint, File Explorer and Command Prompt can be launched.
+              Anything else is refused, and Windows-only tools report “unsupported” elsewhere.</p>
+          </article>
+          <article class="card safety-card reveal">
+            <p class="safety-num"><span class="count-up" data-count="26">26</span><span class="safety-num-suffix"> / 26</span></p>
+            <h3>Tools write to the audit log</h3>
+            <p>All 26 tools run through the registry, which records every call — success or
+              failure — with secrets and file contents redacted. You can export or delete your data.</p>
+          </article>
+        </div>
+        <div class="privacy-grid">
+          <article class="card reveal"><h3>Local by design</h3><p>The Jarvis backend runs on your own laptop and binds to localhost by default. There is no cloud relay, no telemetry, and no background sync. Your phone reaches it only over your private Tailscale network, after pairing.</p></article>
+          <article class="card reveal"><h3>Permissions first</h3><p>Apps can only be launched from an allowlist, files only inside approved folders, and browser actions only on domains you approve. Sensitive fields — passwords, cards, tokens — are never read or filled.</p></article>
+          <article class="card reveal"><h3>What leaves your laptop</h3><p>Chat text and the content you ask to summarise are sent to Gemini; search queries go to your chosen search provider; Gmail and Calendar data goes to Gemini only when you ask for a summary, and only after you sign in with Google. Passwords and API keys are never stored in memory or logs.</p></article>
+        </div>
       </div>
+    </section>
+
+    <!-- 08 · Access / setup -->
+    <section class="section" id="access">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">08</span> · Access</p>
+        <h2 class="reveal">Start where it actually runs.</h2>
+        <p class="section-intro reveal">No prices, no tiers to buy — Jarvis is a personal project
+          that runs on your own laptop. Pick the setup that matches where you are.</p>
+        <div class="access-grid">
+          <article class="card access-card reveal">
+            <p class="card-kicker">Local · Free</p>
+            <h3>Runs on your laptop</h3>
+            <p>Clone the repo, start the FastAPI backend, and open the companion in your
+              browser. Chat, tools, reminders and notes all work on the laptop itself.</p>
+            <ul class="access-list">
+              <li>Backend on localhost, no account</li>
+              <li>26 tools, voice input, daily briefing</li>
+              <li>Read-only Gmail &amp; Calendar after Google sign-in</li>
+            </ul>
+            <a class="btn btn-ghost" href="https://github.com/Kshaurya-07/Jarvis">Read the README</a>
+          </article>
+
+          <article class="card access-card access-card-featured reveal">
+            <p class="card-kicker">Paired · Most useful</p>
+            <h3>Phone via Tailscale + 6-digit code</h3>
+            <p>Pair your phone with your laptop using a one-time 6-digit code. Then send
+              commands from your phone and watch them happen on your laptop.</p>
+            <ul class="access-list">
+              <li>One laptop paired at a time today</li>
+              <li>Stop a running task from your phone</li>
+              <li>See connection status and activity history</li>
+            </ul>
+            <label class="toggle-row">
+              <span class="toggle-label">Preview spoken replies</span>
+              <button class="toggle" id="spoken-toggle" role="switch" aria-checked="false" aria-controls="spoken-preview">
+                <span class="toggle-knob" aria-hidden="true"></span><span class="sr-only">Toggle spoken reply preview</span>
+              </button>
+            </label>
+            <p class="spoken-preview" id="spoken-preview" hidden>“Done — I read the file on your laptop and sent the summary back to your phone.”<br><span>Spoken replies are optional in the companion; voice recognition itself runs in your browser.</span></p>
+            <a class="btn btn-primary" href="/mobile/">Open Companion</a>
+          </article>
+
+          <article class="card access-card reveal">
+            <p class="card-kicker">Planned</p>
+            <h3>Multi-device</h3>
+            <p>Choosing between several paired devices, laptop-to-phone actions, and a
+              tablet command flow. These are directions on the roadmap, not promises.</p>
+            <ul class="access-list">
+              <li>Multi-device picker — in development</li>
+              <li>Laptop → phone actions — planned</li>
+              <li>Tablet command flow — planned</li>
+            </ul>
+            <a class="btn btn-ghost" href="#compare">See what’s planned</a>
+          </article>
+        </div>
+
+        <div class="roadmap-table-wrap reveal">
+          <table class="roadmap-table">
+            <caption>Roadmap — what works now, what is being built, what is planned</caption>
+            <thead>
+              <tr><th scope="col">Feature</th><th scope="col">Status</th><th scope="col">Notes</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Phone → laptop commands (chat, tools, voice)</td><td><span class="badge badge-available">Available</span></td><td>Paired over Tailscale with a one-time code.</td></tr>
+              <tr><td>Voice input, editable transcript, spoken replies</td><td><span class="badge badge-available">Available</span></td><td>Browser speech recognition; audio stays on-device.</td></tr>
+              <tr><td>Read-only Gmail &amp; Calendar summaries</td><td><span class="badge badge-permission">Requires permission</span></td><td>Google sign-in with read-only scopes.</td></tr>
+              <tr><td>Choosing between several paired devices</td><td><span class="badge badge-indev">In development</span></td><td>One laptop can be paired at a time today.</td></tr>
+              <tr><td>Laptop → phone actions (e.g. reminders on your phone)</td><td><span class="badge badge-planned">Planned</span></td><td>Needs a phone companion that can receive actions.</td></tr>
+              <tr><td>Tablet as a command source</td><td><span class="badge badge-planned">Planned</span></td><td>The companion web app opens in a tablet browser; a dedicated flow is planned.</td></tr>
+              <tr><td>Wi-Fi, volume &amp; brightness controls</td><td><span class="badge badge-planned">Planned</span></td><td>Interfaces exist in code; the features are not implemented.</td></tr>
+              <tr><td>Windows-only tools (app launch, screenshots, system status)</td><td><span class="badge badge-available">Available — Windows</span></td><td>On macOS/Linux these report “unsupported”.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine-print reveal">Jarvis will never claim a feature is ready until it is
+          implemented and tested. Anything marked Planned here is a direction, not a promise.</p>
+      </div>
+    </section>
+
+    <!-- 09 · From the project -->
+    <section class="section" id="project">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span class="eyebrow-num">09</span> · From the project</p>
+        <h2 class="reveal">Notes, roadmap and code.</h2>
+        <p class="section-intro reveal">Jarvis has no published papers. What it does have is
+          the code, the safety rules in it, and the roadmap on this page.</p>
+        <div class="project-grid">
+          <article class="card project-card reveal">
+            <svg class="project-art" viewBox="0 0 320 120" aria-hidden="true">
+              <circle cx="160" cy="60" r="44" fill="none" stroke="#b7a6f5" stroke-opacity="0.5"/>
+              <circle cx="160" cy="60" r="26" fill="none" stroke="#b7a6f5" stroke-opacity="0.8"/>
+              <path d="M160 38 v-14 M160 82 v14 M138 60 h-14 M182 60 h14" stroke="#b7a6f5" stroke-width="2"/>
+              <circle cx="160" cy="60" r="6" fill="#f5f1e8"/>
+            </svg>
+            <p class="card-kicker">System · Security</p>
+            <h3>Safety rules, in code</h3>
+            <p>Allowlisted apps and domains, confirmation IDs, redacted logs, and the
+              checks that keep the backend local-first. Read the security module itself.</p>
+            <a class="text-link" href="https://github.com/Kshaurya-07/Jarvis/blob/main/backend/app/core/security.py">backend/app/core/security.py →</a>
+          </article>
+          <article class="card project-card reveal">
+            <svg class="project-art" viewBox="0 0 320 120" aria-hidden="true">
+              <path d="M20 100 L110 40 L200 70 L300 20" fill="none" stroke="#b7a6f5" stroke-width="2"/>
+              <circle cx="20" cy="100" r="5" fill="#b7a6f5"/><circle cx="110" cy="40" r="5" fill="#b7a6f5"/>
+              <circle cx="200" cy="70" r="5" fill="#b7a6f5"/><circle cx="300" cy="20" r="5" fill="#f5f1e8"/>
+              <line x1="20" y1="112" x2="300" y2="112" stroke="#f5f1e8" stroke-opacity="0.15"/>
+            </svg>
+            <p class="card-kicker">Roadmap</p>
+            <h3>Where Jarvis is going</h3>
+            <p>What works now, what is being built, and what is still planned — including
+              the limits, labelled honestly on this page.</p>
+            <a class="text-link" href="#access">Roadmap table →</a>
+          </article>
+          <article class="card project-card reveal">
+            <svg class="project-art" viewBox="0 0 320 120" aria-hidden="true">
+              <rect x="90" y="18" width="140" height="84" rx="8" fill="none" stroke="#b7a6f5" stroke-width="1.5"/>
+              <line x1="110" y1="42" x2="210" y2="42" stroke="#b7a6f5" stroke-width="2"/>
+              <line x1="110" y1="60" x2="190" y2="60" stroke="#f5f1e8" stroke-opacity="0.4" stroke-width="2"/>
+              <line x1="110" y1="78" x2="200" y2="78" stroke="#f5f1e8" stroke-opacity="0.4" stroke-width="2"/>
+            </svg>
+            <p class="card-kicker">GitHub · README</p>
+            <h3>The whole project</h3>
+            <p>Setup, architecture, the companion app, the Chrome extension, and all 26
+              tools — in the repository README.</p>
+            <a class="text-link" href="https://github.com/Kshaurya-07/Jarvis/blob/main/README.md">README.md →</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Manifesto -->
+    <section class="section manifesto" id="manifesto">
+      <div class="wrap manifesto-wrap">
+        <div class="manifesto-core" aria-hidden="true">
+          <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" fill="none" stroke="#b7a6f5" stroke-opacity="0.35"/><circle cx="100" cy="100" r="60" fill="none" stroke="#b7a6f5" stroke-opacity="0.5"/><circle cx="100" cy="100" r="26" fill="#b7a6f5" opacity="0.85"/><circle cx="100" cy="100" r="10" fill="#f5f1e8"/></svg>
+        </div>
+        <blockquote class="manifesto-quote" id="manifesto-quote">
+          <p>“We don’t want an assistant that answers faster. We want one that answers
+            honestly — that says what it did, what it can’t do yet, and why.”</p>
+        </blockquote>
+        <p class="manifesto-attr reveal">— The idea behind Jarvis, a personal project</p>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="section cta-section" id="start">
+      <div class="wrap">
+        <div class="cta-box reveal">
+          <p class="eyebrow"><span class="eyebrow-num">10</span> · Start here</p>
+          <h2>Try it on your laptop.</h2>
+          <p>Ask it something hard — but ask the real companion, not this box.
+            The box below is only a preview: it sends nothing anywhere.</p>
+          <form class="ask-form" id="ask-form">
+            <label class="sr-only" for="ask-input">Ask Jarvis (preview only — sends nothing)</label>
+            <input type="text" id="ask-input" placeholder="e.g. Summarise the notes in my workspace…" autocomplete="off">
+            <button class="btn btn-primary" type="submit">Ask</button>
+          </form>
+          <p class="ask-note" id="ask-note">Preview only — this box does not send your question anywhere.
+            Open the companion to ask for real.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="/mobile/">Open Companion</a>
+            <a class="btn btn-ghost" href="/demo/">Open study demo</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <nav aria-label="Footer, product">
+        <p class="footer-col-title">Product</p>
+        <a href="/mobile/">Companion</a>
+        <a href="/demo/">Study demo</a>
+        <a href="#how">How it works</a>
+        <a href="#demo">Live demo</a>
+      </nav>
+      <nav aria-label="Footer, capabilities">
+        <p class="footer-col-title">Capabilities</p>
+        <a href="#compare">Compare capabilities</a>
+        <a href="#tools-chart">Tools by category</a>
+        <a href="#developers">For developers</a>
+        <a href="#access">Roadmap</a>
+      </nav>
+      <nav aria-label="Footer, privacy">
+        <p class="footer-col-title">Privacy</p>
+        <a href="#privacy">Safety &amp; control</a>
+        <a href="#access">Access &amp; setup</a>
+        <a href="https://github.com/Kshaurya-07/Jarvis/blob/main/backend/app/core/security.py">Security in code</a>
+      </nav>
+      <nav aria-label="Footer, project">
+        <p class="footer-col-title">Project</p>
+        <a href="https://github.com/Kshaurya-07/Jarvis">GitHub repository</a>
+        <a href="https://github.com/Kshaurya-07/Jarvis/blob/main/README.md">README</a>
+        <a href="#project">From the project</a>
+      </nav>
     </div>
-  </aside>
-
-  <!-- Settings & Privacy Drawer -->
-  <aside id="settings-drawer" class="drawer" aria-hidden="true">
-    <div class="drawer-header">
-      <h2>Settings & Privacy</h2>
-      <button id="close-settings-btn" class="drawer-close" aria-label="Close Drawer">&times;</button>
+    <div class="footer-wordmark" aria-hidden="true">Jarvis</div>
+    <div class="wrap footer-bottom">
+      <p>Jarvis — a personal project. No account, no cloud relay, no telemetry.</p>
+      <p>All features described here reflect the code in the repository.</p>
     </div>
-    <div class="drawer-content">
-      <section class="settings-section highlight-section">
-        <h3>Private Tailscale Connection</h3>
-        <p class="settings-subtext">
-          Connect securely to your Windows laptop over private Tailscale. No cloud relays or open ports.
-        </p>
+  </footer>
 
-        <div class="form-group" style="margin-top: 0.75rem;">
-          <label for="remote-gateway-url" style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.25rem;">Laptop Tailscale Address</label>
-          <input type="url" id="remote-gateway-url" class="settings-input" placeholder="https://my-laptop.tailnet-xyz.ts.net" autocomplete="off" spellcheck="false" style="width:100%; padding:0.5rem; background:#0f172a; border:1px solid var(--border); border-radius:6px; color:#fff; font-size:0.85rem;">
-          <small style="display:block; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">Provided by running <code>tailscale serve</code> on your laptop.</small>
-        </div>
-
-        <div id="pair-controls-container" style="margin-top: 0.75rem;">
-          <div class="form-group">
-            <label for="pairing-code-input" style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.25rem;">One-Time Pairing Code</label>
-            <input type="text" id="pairing-code-input" class="settings-input" placeholder="e.g. 749218" maxlength="8" autocomplete="off" inputmode="numeric" style="width:100%; padding:0.5rem; background:#0f172a; border:1px solid var(--border); border-radius:6px; color:#fff; font-size:1.1rem; letter-spacing:2px; font-weight:bold;">
-            <small style="display:block; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">Run <code>python -m app.cli pair</code> on your laptop to generate a 5-minute code.</small>
-          </div>
-          <button id="pair-submit-btn" class="btn-primary" style="width:100%; margin-top:0.75rem; padding:0.6rem; border-radius:6px; background:var(--accent); color:#0f172a; font-weight:bold; cursor:pointer;">Connect & Pair</button>
-        </div>
-
-        <div id="paired-status-container" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px;">
-          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-            <span class="status-dot online" style="background:#22c55e; width:8px; height:8px; border-radius:50%; display:inline-block;"></span>
-            <strong style="color: #4ade80; font-size: 0.85rem;">Paired & Active</strong>
-          </div>
-          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">Session token held in volatile memory only. Never stored in localStorage.</p>
-          <button id="disconnect-btn" class="btn-secondary" style="width:100%; padding:0.5rem; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Disconnect & Revoke Token</button>
-        </div>
-
-        <!-- Visible only when opened locally on the laptop -->
-        <div id="local-pair-helper" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
-          <button id="generate-pairing-code-btn" class="btn-secondary" style="width:100%; padding:0.5rem; font-size:0.85rem;">Generate Laptop Pairing Code</button>
-          <div id="generated-code-display" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #0f172a; border-radius: 6px; text-align: center;">
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Pairing Code:</span>
-            <div id="displayed-code" style="font-size: 1.4rem; font-weight: bold; letter-spacing: 3px; color: var(--accent); margin: 0.25rem 0;">-</div>
-            <small style="color: var(--text-muted); font-size: 0.7rem;">Valid for 5 minutes (in-memory only)</small>
-          </div>
-        </div>
-      </section>
-
-      <section class="settings-section">
-        <h3>Command History Privacy</h3>
-        <label class="setting-toggle">
-          <input type="checkbox" id="opt-in-history-toggle">
-          <span class="toggle-label">Save local command history on this device</span>
-        </label>
-        <p class="settings-subtext">Off by default. When enabled, commands are saved only in your browser's local storage. Never stores credentials, keys, or passwords.</p>
-        <button id="clear-history-btn" class="btn-secondary">Clear Local Command History</button>
-      </section>
-
-      <section class="settings-section">
-        <h3>Voice & Audio (Push-to-Talk)</h3>
-        <label class="setting-toggle">
-          <input type="checkbox" id="tts-toggle">
-          <span class="toggle-label">Speak assistant replies aloud (TTS)</span>
-        </label>
-        <p class="settings-subtext">Speech recognition runs on-device using your browser's Web Speech API. Raw audio is never sent to the server or Gemini.</p>
-      </section>
-
-      <section class="settings-section">
-        <h3>System Details</h3>
-        <div id="system-metadata" class="system-metadata">
-          <div><span>Version:</span> <strong id="sys-version">-</strong></div>
-          <div><span>Platform:</span> <strong id="sys-platform">-</strong></div>
-          <div><span>Gemini Configured:</span> <strong id="sys-gemini">-</strong></div>
-          <div><span>Google OAuth:</span> <strong id="sys-google">-</strong></div>
-          <div><span>Active Tools:</span> <strong id="sys-tools-count">-</strong></div>
-        </div>
-      </section>
-    </div>
-  </aside>
-
-  <!-- Demo Mode Drawer (Phase 10 Guided Tour) -->
-  <aside id="demo-drawer" class="drawer" aria-hidden="true">
-    <div class="drawer-header">
-      <h2>Guided Demo</h2>
-      <button id="close-demo-btn" class="drawer-close" aria-label="Close Drawer">&times;</button>
-    </div>
-    <div class="drawer-content">
-      <p class="drawer-desc">
-        Phase 10 Guided Demo — an end-to-end interactive demo connecting the assistant, local study page, and Chrome extension. Uses fictional science data with zero personal accounts. See the <a href="/landing/" style="color:var(--accent);">Jarvis vision page</a> for what works today and what is planned.
-      </p>
-
-      <section class="settings-section">
-        <h3>Local Demo Controls</h3>
-        <div class="demo-actions-row">
-          <a href="/demo/" target="_blank" class="btn-demo-action" title="Open fictional study page in a new tab">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-            <span>Open Demo Page</span>
-          </a>
-          <button id="seed-demo-btn" class="btn-demo-action" title="Seed fictional mock notes & reminders">
-            Seed Demo Data
-          </button>
-          <button id="reset-demo-btn" class="btn-demo-action btn-demo-danger" title="Remove all mock demo data in one step">
-            Clear Demo Data
-          </button>
-        </div>
-      </section>
-
-      <section class="settings-section">
-        <h3>End-to-End Walkthrough Steps</h3>
-        
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">1</span>
-            <span>Check Connection Status</span>
-          </div>
-          <div class="demo-step-desc">
-            The status pill above confirms local loopback binding. Shows whether Gemini AI reasoning is online or running in offline mock mode.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">2</span>
-            <span>Send a Text Command</span>
-          </div>
-          <div class="demo-step-desc">
-            Type or click a quick chip below (e.g. <em>"What is the system status?"</em> or <em>"Show my demo notes"</em>). Jarvis executes safe registered tools.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">3</span>
-            <span>Open Chrome Demo Page & Extension</span>
-          </div>
-          <div class="demo-step-desc">
-            Open <a href="/demo/" target="_blank" style="color:var(--accent);">/demo/</a> in Google Chrome, click the Jarvis toolbar extension icon, and select <strong>"Read this page"</strong>.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">4</span>
-            <span>Inspect Extracted Text & Disclosure</span>
-          </div>
-          <div class="demo-step-desc">
-            The extension displays character count and clarifies that text is sent to Gemini for grounded summarization or practice quiz study assistance.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">5</span>
-            <span>Push-to-Talk Voice Input</span>
-          </div>
-          <div class="demo-step-desc">
-            Tap the microphone button, speak your request, inspect and edit the local transcript in the input box, then send.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">6</span>
-            <span>Active Stop / Pause Control</span>
-          </div>
-          <div class="demo-step-desc">
-            During any in-flight agent processing, click the red <strong>Stop</strong> button to immediately abort via <code>AbortController</code>.
-          </div>
-        </div>
-
-        <div class="demo-step-card">
-          <div class="demo-step-header">
-            <span class="demo-step-num">7</span>
-            <span>One-Step Cleanup</span>
-          </div>
-          <div class="demo-step-desc">
-            Tap <strong>"Clear Demo Data"</strong> above at any time to purge mock demo notes and reminders without affecting real user data.
-          </div>
-        </div>
-      </section>
-    </div>
-  </aside>
-
-  <!-- Backdrop overlay for drawers -->
-  <div id="drawer-backdrop" class="drawer-backdrop" style="display: none;"></div>
-
-  <script src="app.js"></script>
+  <script src="landing.js"></script>
 </body>
 </html>

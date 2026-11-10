@@ -97,9 +97,16 @@ def test_mobile_js_functionality_and_stop_control(client):
     assert "/api/confirm" in js
 
 
-def test_mobile_root_redirect(client):
-    """Verify root / redirects to /mobile/ interface."""
+def test_landing_root_redirect(client):
+    """Verify root / redirects to the landing page (the homepage)."""
     res = client.get("/", follow_redirects=False)
+    assert res.status_code == 307
+    assert res.headers["location"] == "/landing/"
+
+
+def test_companion_alias_redirect(client):
+    """Verify /companion/ redirects to the mobile companion interface."""
+    res = client.get("/companion", follow_redirects=False)
     assert res.status_code == 307
     assert res.headers["location"] == "/mobile/"
 

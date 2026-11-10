@@ -252,8 +252,14 @@ async def demo_redirect():
     return RedirectResponse(url="/demo/")
 
 
-@app.get("/", tags=["Companion"])
-async def root_redirect():
-    """Redirect root browser requests to the mobile companion interface."""
+@app.get("/companion", tags=["Companion"])
+async def companion_redirect():
+    """Redirect the /companion/ alias to the mobile companion interface."""
     return RedirectResponse(url="/mobile/")
+
+
+@app.get("/", tags=["Landing"])
+async def root_redirect():
+    """Redirect root browser requests to the vision landing page (the homepage)."""
+    return RedirectResponse(url="/landing/")
 

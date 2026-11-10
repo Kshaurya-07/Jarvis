@@ -11,7 +11,7 @@ actions that are permitted, and reports the result back to you.
 That cross-device vision is the destination, not the starting point. Today,
 phone-to-laptop commands work when your phone is paired with your laptop over
 your private Tailscale network; the other directions are labelled honestly in
-the status table below and on the [vision landing page](frontend/landing/index.html).
+the status table below and on the [vision landing page](frontend/landing/index.html) — the homepage at `/` (also at `/landing/`).
 
 Under the hood, a FastAPI backend on your own laptop talks to Google Gemini,
 which can call 26 tools: read and search your files and notes, control
@@ -132,8 +132,9 @@ On macOS/Linux use `python3 -m venv .venv`,
 `source .venv/bin/activate`, `cp .env.example .env`, and from `backend/`:
 `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`.
 
-Open `http://127.0.0.1:8000/` (redirects to `/mobile/`) or
-`http://127.0.0.1:8000/demo/`. Check health with
+Open `http://127.0.0.1:8000/` (redirects to the vision landing page at
+`/landing/`, the homepage), `http://127.0.0.1:8000/mobile/` for the
+companion, or `http://127.0.0.1:8000/demo/`. Check health with
 `GET http://127.0.0.1:8000/health`.
 
 ### Chrome extension
@@ -361,17 +362,18 @@ tests. The repo root stays small — `README.md`, `.env.example`,
 ```
 Jarvis/
 ├── frontend/
-│   ├── landing/                 # Vision landing page (/landing/)
+│   ├── landing/                 # Vision landing page — the HOMEPAGE (/)
 │   │   ├── index.html           # 3D hero, scroll + pointer effects
 │   │   ├── landing.css
 │   │   └── landing.js
-│   ├── mobile/                  # Mobile PWA companion (/mobile/)
+│   ├── mobile/                  # Mobile PWA companion (/mobile/, alias /companion/)
 │   │   └── icons/               # icon-192.png, icon-512.png (manifest + service worker)
 │   ├── demo/                    # Fictional local demo page (/demo/)
 │   ├── extension/               # Chrome extension, Manifest V3 (activeTab, scripting)
 │   │   └── icons/               # icon16.png, icon48.png, icon128.png (manifest.json)
-│   └── public/                  # Static build output for the hosted PWA
-│       ├── icons/               # copied from frontend/mobile/icons/
+│   └── public/                  # Static build output for the hosted site
+│       ├── index.html           # landing page at / (copied from frontend/landing/)
+│       ├── mobile/              # companion at /mobile/ (copied from frontend/mobile/)
 │       └── landing/, demo/      # (generated — run backend/scripts/prepare_static.py;
 │                                #  the committed output must stay in sync, checked by CI)
 ├── backend/

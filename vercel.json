@@ -4,7 +4,7 @@
   "outputDirectory": "frontend/public",
   "headers": [
     {
-      "source": "/service-worker.js",
+      "source": "/mobile/service-worker.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -12,12 +12,12 @@
         },
         {
           "key": "Service-Worker-Allowed",
-          "value": "/"
+          "value": "/mobile/"
         }
       ]
     },
     {
-      "source": "/manifest.webmanifest",
+      "source": "/mobile/manifest.webmanifest",
       "headers": [
         {
           "key": "Content-Type",
@@ -27,6 +27,18 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/companion",
+      "destination": "/mobile/index.html"
+    },
+    {
+      "source": "/companion/",
+      "destination": "/mobile/index.html"
+    },
+    {
+      "source": "/landing",
+      "destination": "/landing/index.html"
+    },
     {
       "source": "/demo",
       "destination": "/demo/index.html"
