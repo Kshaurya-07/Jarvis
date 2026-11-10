@@ -4,7 +4,7 @@ import pytest
 
 from app.core.config import settings
 from app.core.remote_auth import remote_session_manager
-from app.main import app, is_allowed_origin, is_allowed_host
+from app.main import app, is_allowed_host
 
 PROD_ORIGIN = "https://jarvis-kumar-shaurya.vercel.app"
 PREVIEW_ORIGIN = "https://jarvis-eta-ten-83.vercel.app"
