@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class ConfigurationError(Exception):
     """Raised when application configuration contains unsafe or fatal values."""
-    pass
 
 
 class Settings(BaseSettings):
