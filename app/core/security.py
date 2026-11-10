@@ -10,33 +10,24 @@ ALLOWED_TEXT_EXTENSIONS: Set[str] = {
     ".sql", ".env.example", ".gitignore"
 }
 
-# Dangerous patterns in paths
-DANGEROUS_PATTERNS = ["..", "\0", "~"]
-
-
 class SecurityViolationError(Exception):
     """Raised when a path traversal, escaping directory, or security boundary violation is detected."""
-    pass
 
 
 class InvalidPathError(Exception):
     """Raised when a path is malformed or invalid."""
-    pass
 
 
 class FileSizeExceededError(Exception):
     """Raised when a requested file exceeds the configured maximum read size."""
-    pass
 
 
 class UnsupportedFileTypeError(Exception):
     """Raised when a non-text or binary file is requested."""
-    pass
 
 
 class UnsupportedPlatformError(Exception):
     """Raised when an OS-specific tool is called on an unsupported platform."""
-    pass
 
 
 def verify_windows_os(tool_name: str) -> None:
@@ -119,11 +110,13 @@ def validate_text_file(path: Path, max_bytes: int) -> None:
     if not path.is_file():
         raise InvalidPathError(f"Target '{path.name}' is not a regular file.")
 
-    # Check file extension
+    # Check file extension. Extension-less files are not exempt: a file
+    # with no suffix is rejected unless its full name is explicitly
+    # allowlisted (e.g. ".env.example", ".gitignore").
     suffix = path.suffix.lower()
-    if suffix and suffix not in ALLOWED_TEXT_EXTENSIONS:
+    if suffix not in ALLOWED_TEXT_EXTENSIONS and path.name not in ALLOWED_TEXT_EXTENSIONS:
         raise UnsupportedFileTypeError(
-            f"File extension '{suffix}' is not supported. Supported text types: "
+            f"File extension '{suffix or '(none)'}' is not supported. Supported text types: "
             f"{', '.join(sorted(ALLOWED_TEXT_EXTENSIONS))}"
         )
 
