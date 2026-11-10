@@ -9,7 +9,6 @@ from app.core.google_auth import (
     google_auth_manager,
     GoogleAuthRequiredError,
     GoogleTokenRevokedError,
-    GoogleConfigError,
 )
 from app.core.logger import app_logger
 from app.tools.base import ToolResult
