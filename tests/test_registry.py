@@ -1,4 +1,3 @@
-import pytest
 
 from app.core.logger import action_logger
 from app.tools.registry import tool_registry
