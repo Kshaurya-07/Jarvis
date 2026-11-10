@@ -1,5 +1,4 @@
-from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from typing import Optional
 
 from app.core.browser_automation import (
     browser_manager,
@@ -8,10 +7,8 @@ from app.core.browser_automation import (
     check_forbidden_action,
     BrowserSecurityViolation,
     DomainSecurityViolation,
-    SensitiveFieldViolation,
 )
 from app.core.confirmation import confirmation_manager
-from app.core.logger import app_logger
 from app.tools.base import ToolResult
 from app.tools.memory_tools import detect_sensitive_data
 
