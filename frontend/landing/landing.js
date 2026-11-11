@@ -305,7 +305,7 @@
 
   function resizeWebGL() {
     if (!canvas || !gl) return;
-    var dpr = clamp(window.devicePixelRatio || 1, 0.8, 1.5);
+    var dpr = clamp((window.devicePixelRatio || 1) * 0.8, 0.75, 1.5);
     var w = Math.round(window.innerWidth * dpr);
     var h = Math.round(window.innerHeight * dpr);
     if (canvas.width !== w || canvas.height !== h) {
@@ -636,24 +636,50 @@
     { label: "Browser", tools: 3, total: 26, x: 680 }
   ];
   function chartY(v) { return 280 - (v / 26) * 240; }
+  var chartScrubber = document.getElementById("chart-scrubber-line");
+  var chartActiveCat = document.getElementById("chart-active-cat");
+  var chartActiveTools = document.getElementById("chart-active-tools");
+  var chartActiveTotal = document.getElementById("chart-active-total");
+
   if (chartSvg && chartTip && chartCursor) {
-    chartSvg.addEventListener("pointermove", function (ev) {
+    function updateScrubber(ev) {
       var rect = chartSvg.getBoundingClientRect();
-      var svgX = (ev.clientX - rect.left) / rect.width * 720;
+      var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      var svgX = ((clientX - rect.left) / rect.width) * 720;
       var nearest = chartData[0];
       chartData.forEach(function (d) {
         if (Math.abs(d.x - svgX) < Math.abs(nearest.x - svgX)) nearest = d;
       });
+
+      // Update dot cursor
       chartCursor.setAttribute("cx", String(nearest.x));
       chartCursor.setAttribute("cy", String(chartY(nearest.tools)));
       chartCursor.setAttribute("opacity", "1");
+
+      // Update vertical scrubber line
+      if (chartScrubber) {
+        chartScrubber.setAttribute("x1", String(nearest.x));
+        chartScrubber.setAttribute("x2", String(nearest.x));
+        chartScrubber.setAttribute("opacity", "0.75");
+      }
+
+      // Update live numbers beside chart
+      if (chartActiveCat) chartActiveCat.textContent = nearest.label;
+      if (chartActiveTools) chartActiveTools.textContent = nearest.tools + " tools";
+      if (chartActiveTotal) chartActiveTotal.textContent = nearest.total + " / 26";
+
+      // Update tooltip
       chartTip.hidden = false;
       chartTip.textContent = nearest.label + ": " + nearest.tools + " tools · running total " + nearest.total;
       chartTip.style.left = ((nearest.x / 720) * 100) + "%";
       chartTip.style.top = ((chartY(nearest.tools) / 340) * 100) + "%";
-    });
+    }
+
+    chartSvg.addEventListener("pointermove", updateScrubber);
+    chartSvg.addEventListener("touchmove", updateScrubber, { passive: true });
     chartSvg.addEventListener("pointerleave", function () {
       chartCursor.setAttribute("opacity", "0");
+      if (chartScrubber) chartScrubber.setAttribute("opacity", "0");
       chartTip.hidden = true;
     });
   }
@@ -752,6 +778,37 @@
   // ==========================================================================
   // INITIALIZE
   // ==========================================================================
+  
+  // ==========================================================================
+  // 15. SCROLL ENTRY REVEALS (Subtle blur-plus-offset with stagger)
+  // ==========================================================================
+  function initReveals() {
+    var reveals = document.querySelectorAll(".reveal");
+    if (!reveals.length) return;
+
+    if (prefersReducedMotion || !("IntersectionObserver" in window)) {
+      reveals.forEach(function (el) { el.classList.add("is-visible"); });
+      return;
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {
+      rootMargin: "0px 0px -50px 0px",
+      threshold: 0.08
+    });
+
+    reveals.forEach(function (el) {
+      observer.observe(el);
+    });
+  }
+
+  initReveals();
   initWebGL();
   resizeWebGL();
   window.addEventListener("resize", function () {
@@ -760,5 +817,19 @@
   }, { passive: true });
 
   requestAnimationFrame(render);
+
+
+  // ---- Smooth Scrolling (Lenis) with native fallback ----
+  if (typeof Lenis !== "undefined" && motionOK) {
+    var lenis = new Lenis({
+      duration: 1.2,
+      easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); }
+    });
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+  }
 
 })();
