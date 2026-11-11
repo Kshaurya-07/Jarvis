@@ -1,6 +1,7 @@
 /* ==========================================================================
    Jarvis — Scientific Instrument Landing Page
    Raw WebGL Gravitational Lensing Engine + Scroll-Driven Accretion Journey
+   Optimized for 60/120fps Butter-Smooth Scrolling & Zero-Reflow Frame Budget
    ========================================================================== */
 
 (function () {
@@ -23,7 +24,28 @@
   }
 
   // ==========================================================================
-  // 1. RAW WEBGL GRAVITATIONAL LENSING & 3D JOURNEY
+  // 1. SMOOTH SCROLL ENGINE (Snappy, Low-Friction Lenis with Native Fallback)
+  // ==========================================================================
+  var lenisInstance = null;
+  if (typeof Lenis !== "undefined" && motionOK) {
+    try {
+      lenisInstance = new Lenis({
+        duration: 0.82,
+        easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); },
+        orientation: "vertical",
+        gestureOrientation: "vertical",
+        smoothWheel: true,
+        wheelMultiplier: 1.0,
+        touchMultiplier: 1.2,
+        infinite: false
+      });
+    } catch (e) {
+      lenisInstance = null;
+    }
+  }
+
+  // ==========================================================================
+  // 2. RAW WEBGL GRAVITATIONAL LENSING & 3D JOURNEY
   // ==========================================================================
   var canvas = document.getElementById("bg-canvas");
   var gl = null;
@@ -68,6 +90,7 @@
     "}"
   ].join("\n");
 
+  // Highly optimized fragment shader with early branch elimination for peak FPS
   var FS_SOURCE = [
     "precision highp float;",
     "uniform vec2 R;",
@@ -83,11 +106,13 @@
     "",
     "vec3 disk(vec2 q, float ri, float ro, float d){",
     "  float r = length(q);",
+    "  if (r < ri * 0.75 || r > ro * 1.05) return vec3(0.0);",
+    "  float m = smoothstep(ri, ri + 0.02, r) * (1.0 - smoothstep(ro * 0.55, ro, r));",
+    "  if (m <= 0.001) return vec3(0.0);",
     "  float a = T * 0.45 / (r * sqrt(r) + 0.05);",
     "  vec2 p = mat2(cos(a), -sin(a), sin(a), cos(a)) * q;",
     "  float b = 0.5 + 0.5 * sin(r * 150.0 + n(p * 9.0) * 5.0);",
     "  float g = n(p * 22.0) * 0.6 + 0.4;",
-    "  float m = smoothstep(ri, ri + 0.02, r) * (1.0 - smoothstep(ro * 0.55, ro, r));",
     "  return vec3(1.0, 0.93, 0.82) * m * b * g * (0.05 / (r * r + 0.015)) * d;",
     "}",
     "",
@@ -201,9 +226,9 @@
 
   function resizeWebGL() {
     if (!gl || !canvas) return;
-    var q = Math.min(window.devicePixelRatio || 1, 1.5) * 0.8;
-    var w = Math.round(window.innerWidth * q);
-    var h = Math.round(window.innerHeight * q);
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.25) * 0.75;
+    var w = Math.round(window.innerWidth * dpr);
+    var h = Math.round(window.innerHeight * dpr);
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
@@ -212,7 +237,7 @@
   }
 
   // ==========================================================================
-  // 2. SCROLL TARGETS COMPUTATION
+  // 3. ZERO-REFLOW CACHED LAYOUT METRICS
   // ==========================================================================
   var howSection = document.getElementById("how");
   var heroCentre = document.getElementById("hero-centre");
@@ -228,11 +253,58 @@
     document.getElementById("orbit-lb-3")
   ].filter(Boolean);
 
+  var whyStatement = document.getElementById("statement-text");
+  var whyWords = [];
+  if (whyStatement) {
+    var rawText = whyStatement.textContent.trim();
+    var words = rawText.split(/\s+/);
+    whyStatement.innerHTML = words.map(function (w) {
+      return '<span class="rv-word">' + w + "</span>";
+    }).join(" ");
+    whyWords = Array.prototype.slice.call(whyStatement.querySelectorAll(".rv-word"));
+  }
+
+  var chapterNavLinks = Array.prototype.slice.call(document.querySelectorAll("#chapter-nav .chapter-link"));
+  var chapters = ["companion", "why", "how", "privacy", "access"];
+
+  // Cached positions
+  var cachedVh = window.innerHeight;
+  var cachedVw = window.innerWidth;
+  var cachedHowTop = 0;
+  var cachedHowHeight = 1;
+  var cachedStatementTop = 0;
+  var cachedStatementHeight = 1;
+  var cachedChapterTops = {};
+
+  function updateCachedMetrics() {
+    cachedVh = window.innerHeight;
+    cachedVw = window.innerWidth;
+    var curScroll = (lenisInstance && lenisInstance.scroll !== undefined) ? lenisInstance.scroll : (window.scrollY || window.pageYOffset || 0);
+
+    if (howSection) {
+      var rectHow = howSection.getBoundingClientRect();
+      cachedHowTop = rectHow.top + curScroll;
+      cachedHowHeight = rectHow.height;
+    }
+    if (whyStatement) {
+      var rectWhy = whyStatement.getBoundingClientRect();
+      cachedStatementTop = rectWhy.top + curScroll;
+      cachedStatementHeight = rectWhy.height;
+    }
+    chapters.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        var r = el.getBoundingClientRect();
+        cachedChapterTops[id] = r.top + curScroll;
+      }
+    });
+  }
+
   function getScrollTargets() {
-    var y = window.scrollY || window.pageYOffset || 0;
-    var vh = window.innerHeight;
-    var ht = howSection ? howSection.offsetTop : 99999;
-    var hh = howSection ? (howSection.offsetHeight - vh) : 1;
+    var y = (lenisInstance && lenisInstance.scroll !== undefined) ? lenisInstance.scroll : (window.scrollY || window.pageYOffset || 0);
+    var vh = cachedVh;
+    var ht = cachedHowTop;
+    var hh = cachedHowHeight - vh;
     var hp = clamp((y - ht) / (hh > 0 ? hh : 1), 0, 1);
     var hero = clamp(y / vh, 0, 1);
     var hv = Math.min(
@@ -250,11 +322,11 @@
       s: hp * 3.0
     };
 
-    return { hero: hero, hp: hp, hv: hv, on: on, tg: tg };
+    return { hero: hero, hp: hp, hv: hv, on: on, tg: tg, scrollY: y };
   }
 
   // ==========================================================================
-  // 3. MOUSE / TOUCH HOLD & PARALLAX
+  // 4. MOUSE / TOUCH HOLD & PARALLAX
   // ==========================================================================
   window.addEventListener("pointerdown", function (e) {
     if (e.target.closest("a, button, input, textarea, select, [role='button'], .tab-btn")) return;
@@ -276,28 +348,17 @@
   });
 
   // ==========================================================================
-  // 4. WORD-BY-WORD SCROLL REVEAL (Why Jarvis Exists)
+  // 5. WORD-BY-WORD SCROLL REVEAL (Zero DOM reflow)
   // ==========================================================================
-  var whyStatement = document.getElementById("statement-text");
-  var whyWords = [];
-  if (whyStatement) {
-    var rawText = whyStatement.textContent.trim();
-    var words = rawText.split(/\s+/);
-    whyStatement.innerHTML = words.map(function (w) {
-      return '<span class="rv-word">' + w + "</span>";
-    }).join(" ");
-    whyWords = Array.prototype.slice.call(whyStatement.querySelectorAll(".rv-word"));
-  }
-
-  function updateWordReveal() {
+  function updateWordReveal(y) {
     if (!whyStatement || !whyWords.length) return;
     if (prefersReducedMotion) {
       whyWords.forEach(function (w) { w.style.opacity = "1"; });
       return;
     }
-    var r = whyStatement.getBoundingClientRect();
-    var vh = window.innerHeight;
-    var p = clamp((vh * 0.85 - r.top) / (r.height + vh * 0.35), 0, 1);
+    var vh = cachedVh;
+    var rTop = cachedStatementTop - y;
+    var p = clamp((vh * 0.85 - rTop) / (cachedStatementHeight + vh * 0.35), 0, 1);
     var kWord = p * (whyWords.length + 4);
     whyWords.forEach(function (w, i) {
       w.style.opacity = (0.18 + 0.82 * clamp(kWord - i, 0, 1)).toFixed(2);
@@ -305,18 +366,16 @@
   }
 
   // ==========================================================================
-  // 5. CHAPTER NAVIGATION SCROLL-SPY
+  // 6. CHAPTER NAVIGATION SCROLL-SPY (Zero DOM reflow)
   // ==========================================================================
-  var chapterNavLinks = Array.prototype.slice.call(document.querySelectorAll("#chapter-nav .chapter-link"));
-  var chapters = ["companion", "why", "how", "privacy", "access"];
-
-  function updateChapterNav() {
-    var vh = window.innerHeight;
+  function updateChapterNav(y) {
+    var vh = cachedVh;
     var activeId = "companion";
     for (var i = 0; i < chapters.length; i++) {
-      var sec = document.getElementById(chapters[i]);
-      if (sec && sec.getBoundingClientRect().top < vh * 0.5) {
-        activeId = chapters[i];
+      var chId = chapters[i];
+      var chTop = (cachedChapterTops[chId] !== undefined) ? (cachedChapterTops[chId] - y) : 99999;
+      if (chTop < vh * 0.5) {
+        activeId = chId;
       }
     }
     chapterNavLinks.forEach(function (link) {
@@ -325,7 +384,7 @@
   }
 
   // ==========================================================================
-  // 6. CUSTOM DIFFERENCE CURSOR (34px, lerp smoothed)
+  // 7. CUSTOM DIFFERENCE CURSOR (34px, lerp smoothed)
   // ==========================================================================
   var cursorDot = document.getElementById("cursor-dot");
   var mouseX = -999, mouseY = -999;
@@ -345,28 +404,33 @@
   }
 
   // ==========================================================================
-  // 7. MAIN RENDER & DOM UPDATE LOOP
+  // 8. UNIFIED RENDER & RAF LOOP (Synchronized 60/120fps)
   // ==========================================================================
   var currentStepIdx = -1;
 
   function frame(timestamp) {
-    var state = getScrollTargets();
-    var k = motionOK ? 0.09 : 1.0;
+    // 1. Advance Lenis smooth scroll within the exact same frame
+    if (lenisInstance) {
+      lenisInstance.raf(timestamp);
+    }
 
-    // Smooth state interpolation
+    var state = getScrollTargets();
+    var k = motionOK ? 0.12 : 1.0;
+
+    // 2. Smooth state interpolation
     for (var prop in state.tg) {
       sm[prop] = lerp(sm[prop], state.tg[prop], k);
     }
-    sm.hold = lerp(sm.hold, isHolding ? 1.0 : 0.0, motionOK ? 0.06 : 1.0);
+    sm.hold = lerp(sm.hold, isHolding ? 1.0 : 0.0, motionOK ? 0.08 : 1.0);
 
-    // Smooth cursor
+    // 3. Smooth cursor
     if (finePointer && motionOK && cursorDot) {
-      curX = lerp(curX, mouseX, 0.25);
-      curY = lerp(curY, mouseY, 0.25);
+      curX = lerp(curX, mouseX, 0.28);
+      curY = lerp(curY, mouseY, 0.28);
       cursorDot.style.transform = "translate3d(" + curX.toFixed(1) + "px, " + curY.toFixed(1) + "px, 0)";
     }
 
-    // Hero HUD & Blur/Fade on scroll out
+    // 4. Hero HUD & Blur/Fade on scroll out
     if (hudDist) {
       var dVal = Math.max((26.0 - 22.0 * state.hero) - sm.hold * 4.0, 1.2);
       hudDist.textContent = dVal.toFixed(1);
@@ -382,7 +446,7 @@
       heroCentre.style.filter = heroBlur > 0.1 ? "blur(" + heroBlur.toFixed(1) + "px)" : "none";
     }
 
-    // How It Works Step Swaps & Rail Fill
+    // 5. How It Works Step Swaps & Rail Fill
     var stepIdx = clamp(Math.floor(state.hp * 4.0), 0, 3);
     if (stepIdx !== currentStepIdx) {
       currentStepIdx = stepIdx;
@@ -397,21 +461,21 @@
       railFill.style.height = (state.hp * 100).toFixed(1) + "%";
     }
 
-    // Screen-Projected 3D Orbit Badges
-    var winH = window.innerHeight;
-    var winW = window.innerWidth;
+    // 6. Screen-Projected 3D Orbit Badges
+    var winH = cachedVh;
+    var winW = cachedVw;
     orbitBadges.forEach(function (badge, j) {
       var ri = lerp(0.62, 0.26, j / 3.0);
       var ang = 0.35 + j * 0.12;
       var bx = winW / 2.0 + ri * Math.cos(ang) * sm.z * winH;
       var by = winH / 2.0 - ri * Math.sin(ang) * Math.max(Math.sin(sm.e), 0.04) * sm.z * winH;
-      badge.style.transform = "translate(" + bx.toFixed(1) + "px, " + by.toFixed(1) + "px)";
+      badge.style.transform = "translate3d(" + bx.toFixed(1) + "px, " + by.toFixed(1) + "px, 0)";
 
       var op = sm.h > 0.15 ? (sm.h * (1.0 - Math.min(1.0, Math.abs(sm.s - j))) * 0.6 + sm.h * 0.4) : 0.0;
       badge.style.opacity = op.toFixed(2);
     });
 
-    // WebGL Draw (Skip when canvas is fully black)
+    // 7. WebGL Draw (Skip when canvas is fully black)
     if (gl && webglProgram) {
       if (sm.a < 0.004) {
         if (!blank) {
@@ -441,14 +505,14 @@
       }
     }
 
-    updateWordReveal();
-    updateChapterNav();
+    updateWordReveal(state.scrollY);
+    updateChapterNav(state.scrollY);
 
     requestAnimationFrame(frame);
   }
 
   // ==========================================================================
-  // 8. TABS (Capabilities Comparison)
+  // 9. TABS (Capabilities Comparison)
   // ==========================================================================
   function initTabs(tablist) {
     if (!tablist) return;
@@ -468,6 +532,8 @@
           panel.hidden = !active;
           panel.classList.toggle("is-active", active);
         });
+        // Recalculate metrics when tab height might change
+        setTimeout(updateCachedMetrics, 50);
       });
     });
   }
@@ -476,7 +542,7 @@
   });
 
   // ==========================================================================
-  // 9. TOOLS CHART WITH SCRUBBER & LIVE TOOLTIP
+  // 10. TOOLS CHART WITH SCRUBBER & LIVE TOOLTIP
   // ==========================================================================
   var chartSvg = document.getElementById("tools-chart-svg");
   var chartTip = document.getElementById("chart-tooltip");
@@ -538,7 +604,7 @@
   }
 
   // ==========================================================================
-  // 10. DEVELOPERS: CODE TABS, TYPING & CLIPBOARD
+  // 11. DEVELOPERS: CODE TABS, TYPING & CLIPBOARD
   // ==========================================================================
   var codeSamples = {
     curl: "curl https://jarvis-kumar-shaurya.vercel.app/api/health\n\n# {\"status\": \"ok\", ...}\n# No key needed — the health check is public.",
@@ -605,7 +671,7 @@
   }
 
   // ==========================================================================
-  // 11. DEVELOPERS: STREAMING-LOG PROTOCOL TRACE SIMULATION
+  // 12. DEVELOPERS: STREAMING-LOG PROTOCOL TRACE SIMULATION
   // ==========================================================================
   var streamPanel = document.getElementById("streaming-log-panel");
   var streamCode = document.getElementById("stream-code");
@@ -664,7 +730,7 @@
   }
 
   // ==========================================================================
-  // 12. HONEST BACKEND STATUS PROBE
+  // 13. HONEST BACKEND STATUS PROBE
   // ==========================================================================
   var dot = document.getElementById("backend-dot");
   var statusText = document.getElementById("backend-status-text");
@@ -694,7 +760,7 @@
   }
 
   // ==========================================================================
-  // 13. ACCESS: SPOKEN-REPLY PREVIEW TOGGLE
+  // 14. ACCESS: SPOKEN-REPLY PREVIEW TOGGLE
   // ==========================================================================
   var spokenToggle = document.getElementById("spoken-toggle");
   var spokenPreview = document.getElementById("spoken-preview");
@@ -703,11 +769,12 @@
       var on = spokenToggle.getAttribute("aria-checked") !== "true";
       spokenToggle.setAttribute("aria-checked", on ? "true" : "false");
       spokenPreview.hidden = !on;
+      setTimeout(updateCachedMetrics, 50);
     });
   }
 
   // ==========================================================================
-  // 14. FINAL CTA PREVIEW FORM
+  // 15. FINAL CTA PREVIEW FORM
   // ==========================================================================
   var askForm = document.getElementById("ask-form");
   var askInput = document.getElementById("ask-input");
@@ -721,7 +788,7 @@
   }
 
   // ==========================================================================
-  // 15. SCROLL ENTRY REVEALS (Subtle blur-plus-offset with stagger)
+  // 16. SCROLL ENTRY REVEALS (Subtle blur-plus-offset with stagger)
   // ==========================================================================
   function initReveals() {
     var reveals = document.querySelectorAll(".reveal");
@@ -755,26 +822,18 @@
   initReveals();
   initWebGL();
   resizeWebGL();
+  updateCachedMetrics();
+
   window.addEventListener("resize", function () {
     resizeWebGL();
     renderTextTexture();
+    updateCachedMetrics();
   }, { passive: true });
 
-  requestAnimationFrame(frame);
-
-  // ---- Smooth Scrolling (Lenis) with native fallback ----
   window.addEventListener("load", function () {
-    if (typeof Lenis !== "undefined" && motionOK) {
-      var lenis = new Lenis({
-        duration: 1.2,
-        easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); }
-      });
-      function raf(time) {
-        lenis.raf(time);
-        requestAnimationFrame(raf);
-      }
-      requestAnimationFrame(raf);
-    }
+    updateCachedMetrics();
   });
+
+  requestAnimationFrame(frame);
 
 })();
