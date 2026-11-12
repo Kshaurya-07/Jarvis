@@ -178,7 +178,8 @@ def test_browser_navigate_confirmation_lifecycle():
     confirmation_manager.confirm_action(conf_id)
     res_confirmed = browser_navigate(url=url, approved_domain="wikipedia.org", confirmation_id=conf_id)
     assert res_confirmed.success is True
-    assert res_confirmed.output["status"] == "navigated"
+    assert res_confirmed.output["status"] == "pending_extension"
+    assert "staged for the browser extension" in res_confirmed.output["message"]
 
 
 def test_browser_fill_field_confirmation_lifecycle():
@@ -208,7 +209,8 @@ def test_browser_fill_field_confirmation_lifecycle():
         confirmation_id=conf_id,
     )
     assert res_confirmed.success is True
-    assert res_confirmed.output["status"] == "field_filled"
+    assert res_confirmed.output["status"] == "pending_extension"
+    assert "staged for the browser extension" in res_confirmed.output["message"]
     assert "Final submission must be completed manually by you" in res_confirmed.output["note"]
 
 

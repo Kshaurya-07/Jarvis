@@ -1,5 +1,8 @@
 from pathlib import Path
 from typing import Optional
+import difflib
+import logging
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +64,11 @@ class Settings(BaseSettings):
     # reset on restart/redeploy and do not sync across instances.
     GEMINI_CALLS_PER_USER_PER_HOUR: int = 30
     GEMINI_CALLS_PER_USER_PER_DAY: int = 100
+    # Per-user web-search caps (the owner's shared SEARCH_API_KEY pays for
+    # every search, so each user gets their own guard). Enforced by the
+    # usage limiter with kind="search".
+    SEARCH_CALLS_PER_USER_PER_HOUR: int = 30
+    SEARCH_CALLS_PER_USER_PER_DAY: int = 100
 
     # --- External storage (Vercel serverless) ---------------------------
     # DATABASE_URL: Postgres connection string (Neon — see README).
@@ -184,15 +192,18 @@ class Settings(BaseSettings):
                 "unauthorized network access. Set ALLOW_REMOTE_ACCESS=true to explicitly override."
             )
 
-        # 1b. Cloud mode: sign-in must be
-        # possible — a missing/short SESSION_SECRET is a loud warning, not a
-        # fatal error, so local smoke tests can still boot without one.
+        # 1b. Cloud mode: sign-in must be possible — a missing/short
+        # SESSION_SECRET is fatal: without it no session JWT can be issued
+        # and no BYOK key can be encrypted, so a cloud deploy would be
+        # silently broken. (DATABASE_URL stays a loud warning, not fatal:
+        # the test suite intentionally boots CLOUD_MODE with the file
+        # backend, and raising here would make that impossible.)
         if self.CLOUD_MODE:
             if not self.SESSION_SECRET or len(self.SESSION_SECRET) < 32:
-                warnings.append(
-                    "Warning: CLOUD_MODE is on but SESSION_SECRET is missing or shorter "
-                    "than 32 characters. Google sign-in sessions cannot be issued until "
-                    "a long random SESSION_SECRET is set."
+                raise ConfigurationError(
+                    "CLOUD_MODE is on but SESSION_SECRET is missing or shorter "
+                    "than 32 characters. Google sign-in sessions cannot be "
+                    "issued until a long random SESSION_SECRET is set."
                 )
             if not self.DATABASE_URL:
                 warnings.append(
@@ -236,3 +247,32 @@ class Settings(BaseSettings):
 
 settings = Settings()
 settings.resolve_paths()
+
+
+def _warn_unknown_env_keys() -> None:
+    """Log likely env-var typos at startup.
+
+    ``extra="ignore"`` (kept deliberately: Vercel injects extra vars, and
+    ``forbid`` would break deploys) silently swallows misspelled settings
+    such as ``SESSION_SECRETT``. Warn about env keys that are close
+    matches to a real setting name — without failing startup. (The
+    sandbox's own ``JARVIS_*`` runtime variables are not settings and
+    are deliberately not flagged.)
+    """
+    fields = {name.upper() for name in Settings.model_fields}
+    suspects: list[str] = []
+    for key in sorted(os.environ):
+        upper = key.upper()
+        if upper in fields:
+            continue
+        if difflib.get_close_matches(upper, fields, n=1, cutoff=0.75):
+            suspects.append(key)
+    if suspects:
+        logging.getLogger("jarvis").warning(
+            "Unknown environment variable(s) ignored (possible typo of a "
+            "Jarvis setting): %s",
+            ", ".join(suspects),
+        )
+
+
+_warn_unknown_env_keys()

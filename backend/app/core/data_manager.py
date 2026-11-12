@@ -294,7 +294,8 @@ class UserDataManager:
                 "Pass confirm_overwrite=true to confirm and proceed."
             )
 
-        # Restore notes
+        # Restore notes (overwrite by filename: the target file is written
+        # in place, so a restored note replaces any existing same-name note)
         restored_notes = 0
         for note in data.get("notes", []):
             safe_fname = sanitize_filename(Path(note["filename"]).stem) + ".md"
@@ -303,7 +304,11 @@ class UserDataManager:
             target_file.write_text(note["content"], encoding="utf-8")
             restored_notes += 1
 
-        # Restore reminders
+        # Restore reminders: with confirm_overwrite, clear the existing
+        # reminders first — otherwise every restore duplicates them.
+        if confirm_overwrite:
+            for existing in store.list_reminders(u, include_completed=True):
+                store.delete_reminder(u, existing["id"])
         reminders_list = [Reminder(**r) for r in data.get("reminders", [])]
         for r in reminders_list:
             store.add_reminder(u, title=r.title, due_time=r.due_time, notes=r.notes)

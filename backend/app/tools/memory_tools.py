@@ -135,7 +135,11 @@ def remember_item(key: str, content: str, user=None) -> ToolResult:
         key: A short descriptor or category (e.g. 'preferred_language', 'study_topic').
         content: The information to remember.
     """
-    if not settings.MEMORY_ENABLED:
+    # Per-user toggle (falls back to the global MEMORY_ENABLED default).
+    from app.core.store import memory_enabled_for
+    from app.core.user_context import get_current_user, resolve_user
+
+    if not memory_enabled_for(resolve_user(user or get_current_user())):
         return ToolResult(
             success=False,
             error="Memory is currently disabled by user setting. Enable memory to store items.",
@@ -208,7 +212,11 @@ def list_memories(user=None) -> ToolResult:
     """
     List all saved user-approved memory items.
     """
-    if not settings.MEMORY_ENABLED:
+    # Per-user toggle (falls back to the global MEMORY_ENABLED default).
+    from app.core.store import memory_enabled_for
+    from app.core.user_context import get_current_user, resolve_user
+
+    if not memory_enabled_for(resolve_user(user or get_current_user())):
         return ToolResult(
             success=True,
             output={

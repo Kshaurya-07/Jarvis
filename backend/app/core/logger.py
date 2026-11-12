@@ -128,13 +128,20 @@ class ActionLogger:
         return entry
 
     def get_recent_actions(self, limit: int = 50, user: Optional[Any] = None) -> List[ActionLogEntry]:
-        """Returns the most recent in-memory action entries (caller's own only)."""
+        """Returns the most recent in-memory action entries (caller's own only).
+
+        Legacy entries (``user_sub=None``) belong to the local owner only:
+        any other signed-in user never sees them.
+        """
         entries = self._memory_entries
         if user is not None:
             from app.core.user_context import resolve_user
 
-            ns = resolve_user(user).namespace
-            entries = [e for e in entries if e.user_sub in (None, ns)]
+            resolved = resolve_user(user)
+            if resolved.is_local_owner:
+                entries = [e for e in entries if e.user_sub in (None, resolved.namespace)]
+            else:
+                entries = [e for e in entries if e.user_sub == resolved.namespace]
         return entries[-limit:]
 
 

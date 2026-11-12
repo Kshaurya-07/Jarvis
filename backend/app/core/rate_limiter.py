@@ -6,6 +6,21 @@ from fastapi import HTTPException, Request, status
 from app.core.config import settings
 
 
+def get_client_ip(request: Request) -> str:
+    """Best-effort client IP: the leftmost X-Forwarded-For hop when a
+    trusted proxy sets it (on Vercel every request arrives from the shared
+    proxy IP, so ``request.client.host`` alone would lump all users into
+    one bucket), falling back to ``request.client.host``."""
+    xff = request.headers.get("x-forwarded-for") if request is not None else None
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    if request is not None and request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+
 class AuthFailureRateLimiter:
     """
     In-memory rate limiter tracking consecutive authentication and confirmation failures.
@@ -19,16 +34,19 @@ class AuthFailureRateLimiter:
         self._failures: Dict[str, List[float]] = defaultdict(list)
 
     def _extract_ip(self, request: Request) -> str:
-        """Extract client IP safely from request."""
-        if request.client and request.client.host:
-            return request.client.host
-        return "127.0.0.1"
+        """Extract client IP safely from request (X-Forwarded-For first)."""
+        return get_client_ip(request)
 
     def _clean_expired(self, ip: str, now: float) -> None:
-        """Purge timestamps outside the rolling window."""
+        """Purge timestamps outside the rolling window — for the queried IP
+        and, lazily, for every other IP too, so stale entries never pile
+        up in memory."""
         self._failures[ip] = [t for t in self._failures[ip] if now - t < self._window_seconds]
         if not self._failures[ip]:
             self._failures.pop(ip, None)
+        for other in [k for k, v in self._failures.items()
+                      if k != ip and not [t for t in v if now - t < self._window_seconds]]:
+            self._failures.pop(other, None)
 
     def record_failure(self, request_or_ip: Any) -> None:
         """Record an auth or confirmation failure for a client."""

@@ -181,35 +181,87 @@ class BrowserAutomationManager:
     """
     Server-side manager for domain approvals, action validation,
     and safe browser operation planning.
+
+    Approvals are PER USER: the built-in safe defaults apply to everyone,
+    and each user's own approvals are stored in their UserStore
+    (``approved_domains`` setting) so one user's approval can never open
+    a domain for another user. Revocations of a default domain are
+    likewise per user (``revoked_domains`` setting).
     """
 
     def __init__(self):
         self._approved_domains: Set[str] = set(DEFAULT_APPROVED_DOMAINS)
 
-    def get_approved_domains(self) -> List[str]:
-        """Return list of currently approved domains."""
-        return sorted(list(self._approved_domains))
+    def _user_extra_domains(self, user=None) -> Set[str]:
+        try:
+            from app.core.store import get_user_store
+            from app.core.user_context import resolve_user
 
-    def approve_domain(self, domain: str) -> str:
-        """Explicitly add a domain to the approved set."""
+            val = get_user_store().get_setting(resolve_user(user), "approved_domains")
+            return {str(d).lower() for d in val} if isinstance(val, list) else set()
+        except Exception:
+            return set()
+
+    def _user_revoked_domains(self, user=None) -> Set[str]:
+        try:
+            from app.core.store import get_user_store
+            from app.core.user_context import resolve_user
+
+            val = get_user_store().get_setting(resolve_user(user), "revoked_domains")
+            return {str(d).lower() for d in val} if isinstance(val, list) else set()
+        except Exception:
+            return set()
+
+    def _effective_domains(self, user=None) -> Set[str]:
+        return (set(self._approved_domains) | self._user_extra_domains(user)) - self._user_revoked_domains(user)
+
+    def get_approved_domains(self, user=None) -> List[str]:
+        """Return list of currently approved domains for this user."""
+        return sorted(list(self._effective_domains(user)))
+
+    def approve_domain(self, domain: str, user=None) -> str:
+        """Explicitly add a domain to this user's approved set."""
+        from app.core.store import get_user_store
+        from app.core.user_context import resolve_user
+
         clean = normalize_domain(domain)
         if not clean or "." not in clean:
             raise ValueError(f"Invalid domain format: '{domain}'. Must be a valid domain like 'wikipedia.org'.")
-        self._approved_domains.add(clean)
+        _u = resolve_user(user)
+        if clean not in self._approved_domains:
+            extras = self._user_extra_domains(_u)
+            extras.add(clean)
+            get_user_store().set_setting(_u, "approved_domains", sorted(extras))
+        revoked = self._user_revoked_domains(_u)
+        if clean in revoked:
+            revoked.discard(clean)
+            get_user_store().set_setting(_u, "revoked_domains", sorted(revoked))
         app_logger.info("User explicitly approved domain for browser automation: %s", clean)
         return clean
 
-    def revoke_domain(self, domain: str) -> None:
-        """Revoke a domain from the approved set."""
+    def revoke_domain(self, domain: str, user=None) -> None:
+        """Revoke a domain from this user's approved set."""
+        from app.core.store import get_user_store
+        from app.core.user_context import resolve_user
+
         clean = normalize_domain(domain)
-        self._approved_domains.discard(clean)
+        _u = resolve_user(user)
+        extras = self._user_extra_domains(_u)
+        if clean in extras:
+            extras.discard(clean)
+            get_user_store().set_setting(_u, "approved_domains", sorted(extras))
+        if clean in self._approved_domains:
+            revoked = self._user_revoked_domains(_u)
+            revoked.add(clean)
+            get_user_store().set_setting(_u, "revoked_domains", sorted(revoked))
         app_logger.info("Revoked domain for browser automation: %s", clean)
 
-    def is_approved(self, domain: str) -> bool:
-        """Check if a domain is currently approved."""
+    def is_approved(self, domain: str, user=None) -> bool:
+        """Check if a domain is currently approved for this user."""
         clean = normalize_domain(domain)
-        return clean in self._approved_domains or any(
-            clean == d or clean.endswith("." + d) for d in self._approved_domains
+        effective = self._effective_domains(user)
+        return clean in effective or any(
+            clean == d or clean.endswith("." + d) for d in effective
         )
 
 

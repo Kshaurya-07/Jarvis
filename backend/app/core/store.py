@@ -97,6 +97,13 @@ CREATE TABLE IF NOT EXISTS jarvis_usage (
     kind TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS jarvis_user_settings (
+    user_ns TEXT NOT NULL REFERENCES jarvis_users(user_ns) ON DELETE CASCADE,
+    setting_key TEXT NOT NULL,
+    setting_value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_ns, setting_key)
+);
 CREATE INDEX IF NOT EXISTS idx_chat_user_created ON jarvis_chat_history (user_ns, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_usage_user_created ON jarvis_usage (user_ns, kind, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_action_user_created ON jarvis_action_log (user_ns, created_at DESC);
@@ -186,6 +193,15 @@ class UserStore:
         raise NotImplementedError
 
     def count_usage_since(self, user: UserIdentity, kind: str, since_ts: float) -> int:
+        raise NotImplementedError
+
+    # -- per-user settings (memory toggle, approved domains, ...) --
+    # Small key/value store so per-user preferences survive restarts and
+    # are never shared between users. Values must be JSON-serializable.
+    def get_setting(self, user: UserIdentity, key: str) -> Any:
+        raise NotImplementedError
+
+    def set_setting(self, user: UserIdentity, key: str, value: Any) -> None:
         raise NotImplementedError
 
     # -- whole-account wipe / export helpers --
@@ -409,7 +425,7 @@ class FileUserStore(UserStore):
 
     def clear_all_user_data(self, user):
         paths = user_paths(user)
-        counts = {"notes": 0, "reminders": 0, "memories": 0, "screenshots": 0}
+        counts = {"notes": 0, "reminders": 0, "memories": 0, "screenshots": 0, "chat": 0}
         if paths.notes_dir.exists():
             for fp in list(paths.notes_dir.glob("*.md")):
                 try:
@@ -428,7 +444,53 @@ class FileUserStore(UserStore):
         if paths.reminders_file.exists():
             paths.reminders_file.unlink()
         counts["memories"] = self.clear_memories(user)
+        # Chat history and the audit log belong to this user too: a wipe
+        # that leaves them behind is not a wipe. The BYOK key is NOT
+        # deleted (disclosed preservation: the user keeps their key).
+        if paths.chat_history_file.exists():
+            try:
+                counts["chat"] = sum(1 for _ in paths.chat_history_file.read_text(encoding="utf-8", errors="replace").splitlines())
+            except Exception:
+                counts["chat"] = 0
+            try:
+                paths.chat_history_file.unlink()
+            except Exception:
+                pass
+        if paths.action_log_file.exists():
+            try:
+                paths.action_log_file.unlink()
+            except Exception:
+                pass
+        # In-memory usage counters for this user (all kinds).
+        ns = resolve_user(user).namespace
+        for key in [k for k in self._usage if k.startswith(f"{ns}:")]:
+            self._usage.pop(key, None)
         return counts
+
+    # per-user settings (one JSON file per user under their data dir)
+    def _settings_file(self, user):
+        return user_paths(user).data_dir / "settings.json"
+
+    def _read_settings(self, user) -> Dict[str, Any]:
+        p = self._settings_file(user)
+        if not p.exists():
+            return {}
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def get_setting(self, user, key):
+        return self._read_settings(user).get(key)
+
+    def set_setting(self, user, key, value):
+        paths = user_paths(user)
+        paths.data_dir.mkdir(parents=True, exist_ok=True)
+        data = self._read_settings(user)
+        data[key] = value
+        p = self._settings_file(user)
+        p.write_text(json.dumps(data), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -445,7 +507,7 @@ class PostgresUserStore(UserStore):
     def _connect(self):
         import psycopg
 
-        return psycopg.connect(self.dsn, autocommit=True)
+        return psycopg.connect(self.dsn, autocommit=True, connect_timeout=5)
 
     def ensure_schema(self) -> None:
         if self._schema_ready:
@@ -502,36 +564,37 @@ class PostgresUserStore(UserStore):
     def create_note(self, user, title, content):
         from app.core.security import sanitize_filename
 
+        import psycopg
+
         clean = sanitize_filename(title)
         filename = f"{clean}.md"
         now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         formatted = f"# {title.strip()}\n*Created: {now_iso}*\n\n{content}\n"
         self.ensure_schema()
+        # Plain INSERT (no ON CONFLICT): a duplicate filename raises
+        # UniqueViolation, caught below and retried once with a timestamped
+        # filename — the same outcome as before, but without the racy
+        # SELECT-then-INSERT check (two concurrent creates could both see
+        # "free" and one would silently overwrite the other).
         with self._connect() as conn:
             with conn.cursor() as cur:
                 self._ensure_user(cur, user)
-                cur.execute(
-                    "SELECT filename FROM jarvis_notes WHERE user_ns=%s AND filename=%s",
-                    (user.namespace, filename),
-                )
-                if cur.fetchone():
-                    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"{clean}_{ts}.md"
-                cur.execute(
-                    "INSERT INTO jarvis_notes (user_ns, title, filename, content) "
-                    "VALUES (%s, %s, %s, %s) ON CONFLICT (user_ns, filename) DO UPDATE "
-                    "SET title=EXCLUDED.title, content=EXCLUDED.content, updated_at=now()",
-                    (user.namespace, title.strip(), filename, formatted),
-                )
+                for attempt in range(2):
+                    try:
+                        cur.execute(
+                            "INSERT INTO jarvis_notes (user_ns, title, filename, content) "
+                            "VALUES (%s, %s, %s, %s)",
+                            (user.namespace, title.strip(), filename, formatted),
+                        )
+                        break
+                    except psycopg.errors.UniqueViolation:
+                        if attempt == 0:
+                            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"{clean}_{ts}.md"
+                            continue
+                        raise
         return {"title": title.strip(), "filename": filename,
                 "relative_path": filename, "bytes_written": len(formatted.encode("utf-8"))}
-
-    def delete_note(self, user, filename):
-        p = user_paths(user).notes_dir / Path(filename).name
-        if p.exists() and p.is_file():
-            p.unlink()
-            return True
-        return False
 
     def search_notes(self, user, query):
         rows = self._fetch(
@@ -759,10 +822,36 @@ class PostgresUserStore(UserStore):
         )
         return int(rows[0]["n"]) if rows else 0
 
+    # per-user settings
+    def get_setting(self, user, key):
+        rows = self._fetch(
+            "SELECT setting_value FROM jarvis_user_settings WHERE user_ns=%s AND setting_key=%s",
+            (user.namespace, key),
+        )
+        if not rows:
+            return None
+        try:
+            return json.loads(rows[0]["setting_value"])
+        except Exception:
+            return rows[0]["setting_value"]
+
+    def set_setting(self, user, key, value):
+        self._exec(
+            "INSERT INTO jarvis_users (user_ns, email, display_name) VALUES (%s, %s, %s) "
+            "ON CONFLICT (user_ns) DO NOTHING",
+            (user.namespace, user.email, user.name),
+        )
+        self._exec(
+            "INSERT INTO jarvis_user_settings (user_ns, setting_key, setting_value) VALUES (%s, %s, %s) "
+            "ON CONFLICT (user_ns, setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value, updated_at=now()",
+            (user.namespace, key, json.dumps(value)),
+        )
+
     def clear_all_user_data(self, user):
         counts: Dict[str, int] = {}
         for table, label in (("jarvis_notes", "notes"), ("jarvis_reminders", "reminders"),
-                             ("jarvis_memories", "memories"), ("jarvis_chat_history", "chat")):
+                             ("jarvis_memories", "memories"), ("jarvis_chat_history", "chat"),
+                             ("jarvis_usage", "usage"), ("jarvis_action_log", "actions")):
             n = self._exec(f"DELETE FROM {table} WHERE user_ns=%s", (user.namespace,))
             counts[label] = n or 0
         counts["screenshots"] = 0  # screenshots cannot exist in cloud mode
@@ -774,6 +863,24 @@ class PostgresUserStore(UserStore):
 # ---------------------------------------------------------------------------
 
 _store: Optional[UserStore] = None
+
+
+def memory_enabled_for(user: Optional[UserIdentity] = None) -> bool:
+    """Per-user memory toggle: a stored per-user value wins, otherwise the
+    global ``MEMORY_ENABLED`` default (ON). Never raises — a store error
+    falls back to the global default so chat never breaks on a toggle read."""
+    u = resolve_user(user)
+    try:
+        val = get_user_store().get_setting(u, "memory_enabled")
+    except Exception:
+        val = None
+    if val is None:
+        return bool(settings.MEMORY_ENABLED)
+    return bool(val)
+
+
+def set_memory_enabled(user: Optional[UserIdentity], enabled: bool) -> None:
+    get_user_store().set_setting(resolve_user(user), "memory_enabled", bool(enabled))
 
 
 def get_user_store() -> UserStore:

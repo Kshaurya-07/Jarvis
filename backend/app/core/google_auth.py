@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 import httpx
-import keyring
+
+try:
+    import keyring
+except ImportError:  # keyring is optional (not installed in the serverless bundle)
+    keyring = None  # type: ignore[assignment]
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleAuthRequest
@@ -358,9 +362,11 @@ class GoogleAuthManager:
         except Exception as e:
             app_logger.debug("Keyring retrieval error: %s", e)
 
-        # 2. Try fallback file if opt-in enabled or file exists
+        # 2. Fallback file — read ONLY when the user explicitly opted in to
+        # file storage. Reading it whenever the file happens to exist would
+        # silently use credentials the user never agreed to store on disk.
         fallback_path = settings.GOOGLE_FALLBACK_TOKEN_FILE
-        if fallback_path.exists():
+        if settings.GOOGLE_CREDENTIAL_FALLBACK_OPT_IN and fallback_path.exists():
             try:
                 with open(fallback_path, "r", encoding="utf-8") as f:
                     return json.load(f)
@@ -419,11 +425,28 @@ class GoogleAuthManager:
                     payload["access_token"] = creds.token
                     self._save_raw_payload(payload)
                 except Exception as exc:
-                    self._delete_raw_payload()
+                    # Only an explicit revocation / invalid grant means the
+                    # stored credentials are dead: delete them then. A
+                    # transient failure (network, 5xx, timeout) must NOT
+                    # wipe the user's saved tokens — they may work on retry.
+                    err_text = str(exc).lower()
+                    error_details = ""
+                    try:
+                        error_details = str(getattr(exc, "error_details", "") or "").lower()
+                    except Exception:
+                        pass
+                    combined = f"{err_text} {error_details}"
+                    if "invalid_grant" in combined or "revoked" in combined:
+                        self._delete_raw_payload()
+                        self._cached_creds = None
+                        raise GoogleTokenRevokedError(
+                            f"Google OAuth token has expired or been revoked: {str(exc)}. "
+                            "Please reconnect your account via /api/auth/google/url."
+                        ) from exc
                     self._cached_creds = None
-                    raise GoogleTokenRevokedError(
-                        f"Google OAuth token has expired or been revoked: {str(exc)}. "
-                        "Please reconnect your account via /api/auth/google/url."
+                    raise GoogleAuthError(
+                        f"Google token refresh failed (transient): {str(exc)}. "
+                        "Your saved credentials were kept — please try again."
                     ) from exc
             else:
                 raise GoogleAuthRequiredError(

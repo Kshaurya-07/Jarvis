@@ -1,37 +1,37 @@
 /* Design tokens — shared with the landing page (frontend/landing/landing.css):
-   near-black background, warm off-white text, muted grey, one violet-lilac accent. */
+   pure-black background, warm off-white text, muted grey, one electric-blue accent. */
 :root {
-  --bg: #0a0a0c;
-  --bg-primary: #0a0a0c;
-  --bg-secondary: #121215;
-  --bg-tertiary: #17171b;
-  --surface: #121215;
-  --surface-2: #17171b;
-  --text-primary: #f5f1e8;
-  --text-secondary: #a09d94;
-  --text-muted: #6f6d66;
-  --text: #f5f1e8;
-  --muted: #a09d94;
-  --faint: #6f6d66;
-  --accent: #b7a6f5;
-  --accent-hover: #ffffff;
-  --accent-soft: rgba(183, 166, 245, 0.14);
-  --cream: #f5f1e8;
+  --bg: #000000;
+  --bg-primary: #000000;
+  --bg-secondary: #0d0d10;
+  --bg-tertiary: #16161a;
+  --surface: #0d0d10;
+  --surface-2: #16161a;
+  --text-primary: #f2ede4;
+  --text-secondary: #8a8780;
+  --text-muted: #575550;
+  --text: #f2ede4;
+  --muted: #8a8780;
+  --faint: #575550;
+  --accent: #4d6bff;
+  --accent-hover: #3d5be6;
+  --accent-soft: rgba(77, 107, 255, 0.12);
+  --cream: #f2ede4;
   --success: #7ddba3;
   --warning: #e8c87a;
   --danger: #ef4444;
   --danger-hover: #dc2626;
-  --border-color: rgba(245, 241, 232, 0.12);
-  --line: rgba(245, 241, 232, 0.12);
+  --border-color: rgba(242, 237, 228, 0.12);
+  --line: rgba(242, 237, 228, 0.12);
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius: 16px;
   --radius-pill: 999px;
   --touch-target: 48px;
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --transition: 0.2s ease;
 }
 
@@ -77,8 +77,8 @@ body {
   background: linear-gradient(180deg, rgba(24, 22, 32, 0.82), rgba(10, 10, 13, 0.72));
   backdrop-filter: blur(14px) saturate(1.4);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  border-bottom: 1px solid rgba(183, 166, 245, 0.28);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(245, 241, 232, 0.07);
+  border-bottom: 1px solid rgba(77, 107, 255, 0.28);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(242, 237, 228, 0.07);
   z-index: 10;
   min-height: 60px;
 }
@@ -93,7 +93,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #efe7ff 0%, var(--accent) 45%, #5d4fb8 100%);
+  background: radial-gradient(circle at 35% 35%, #dbe2ff 0%, var(--accent) 45%, #2b3fbf 100%);
   box-shadow: 0 0 10px var(--accent);
 }
 
@@ -111,7 +111,7 @@ body {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: var(--radius-pill);
-  background-color: rgba(56, 189, 248, 0.15);
+  background-color: rgba(77, 107, 255, 0.15);
   color: var(--accent);
   text-transform: uppercase;
 }
@@ -192,28 +192,28 @@ body {
 
 /* ==========================================================================
    Futuristic interactive menu bar (glass, glow, hover feedback).
-   Same violet-lilac accent as the landing page. Hover lifts + glows;
+   Same electric-blue accent as the landing page. Hover lifts + glows;
    press scales down. Touch keeps the same buttons, just compact.
    ========================================================================== */
 @keyframes orb-pulse {
   0%, 100% { box-shadow: 0 0 10px var(--accent); transform: scale(1); }
-  50% { box-shadow: 0 0 20px var(--accent), 0 0 34px rgba(183, 166, 245, 0.45); transform: scale(1.12); }
+  50% { box-shadow: 0 0 20px var(--accent), 0 0 34px rgba(77, 107, 255, 0.45); transform: scale(1.12); }
 }
 .logo-orb { animation: orb-pulse 3.2s ease-in-out infinite; }
-.header-brand h1 { text-shadow: 0 0 18px rgba(183, 166, 245, 0.35); }
+.header-brand h1 { text-shadow: 0 0 18px rgba(77, 107, 255, 0.35); }
 
 .nav-pill, .icon-btn {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 .nav-pill:hover, .icon-btn:hover {
   transform: translateY(-1px) scale(1.04);
-  border-color: rgba(183, 166, 245, 0.55);
-  box-shadow: 0 0 16px rgba(183, 166, 245, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
+  border-color: rgba(77, 107, 255, 0.55);
+  box-shadow: 0 0 16px rgba(77, 107, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
   color: var(--text-primary);
 }
 .nav-pill:active, .icon-btn:active { transform: scale(0.96); }
 .nav-pill:focus-visible, .icon-btn:focus-visible {
-  outline: 2px solid rgba(183, 166, 245, 0.8);
+  outline: 2px solid rgba(77, 107, 255, 0.8);
   outline-offset: 2px;
 }
 @keyframes status-pulse {
@@ -229,7 +229,7 @@ body {
 
 /* Network Notice Banner (Option B) */
 .network-notice {
-  background-color: rgba(15, 23, 42, 0.95);
+  background-color: rgba(0, 0, 0, 0.95);
   border-bottom: 1px solid rgba(245, 158, 11, 0.3);
   padding: 8px 14px;
   display: flex;
@@ -279,8 +279,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: rgba(30, 41, 59, 0.9);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  background-color: rgba(13, 13, 16, 0.9);
+  border-bottom: 1px solid rgba(77, 107, 255, 0.3);
   padding: 6px 14px;
   font-size: 0.82rem;
   color: var(--accent);
@@ -290,7 +290,7 @@ body {
 .spinner-small {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(56, 189, 248, 0.3);
+  border: 2px solid rgba(77, 107, 255, 0.3);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -380,8 +380,6 @@ body {
 
 .user-message {
   align-self: flex-end;
-  background-color: #0284c7;
-  color: white;
   border-bottom-right-radius: 4px;
 }
 
@@ -413,8 +411,16 @@ body {
 .welcome-card {
   align-self: stretch;
   max-width: 100%;
-  background-color: rgba(30, 41, 59, 0.7);
+  background-color: rgba(13, 13, 16, 0.7);
   border-left: 4px solid var(--accent);
+}
+/* Before any message is sent the welcome card is the last thing in the
+   stream, so its auto margins centre it vertically (space sits above the
+   footer input). Once a message is appended it is no longer last, the
+   margins collapse to 0, and the stream lays out from the top. */
+.welcome-card:last-child {
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 .quick-tips {
@@ -498,9 +504,11 @@ body {
   cursor: pointer;
 }
 
-/* Footer / Input Area */
+/* Footer / Input Area — same glass treatment as the header. */
 .app-footer {
-  background-color: var(--bg-secondary);
+  background: linear-gradient(0deg, rgba(13, 13, 16, 0.82), rgba(0, 0, 0, 0.72));
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   border-top: 1px solid var(--border-color);
   padding: 10px 12px;
   display: flex;
@@ -535,7 +543,7 @@ body {
 }
 .voice-btn:hover {
   color: var(--text-primary);
-  background-color: #475569;
+  background-color: rgba(77, 107, 255, 0.18);
 }
 .voice-btn.recording {
   background-color: var(--danger);
@@ -554,7 +562,7 @@ body {
 
 .input-field-wrapper:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 0 2px rgba(77, 107, 255, 0.2);
 }
 
 .command-input {
@@ -573,11 +581,13 @@ body {
 
 .send-btn {
   background-color: var(--accent);
-  color: #0f172a;
+  color: #0a0a0c;
 }
 .send-btn:hover:not(:disabled) {
-  background-color: var(--accent-hover);
-  color: white;
+  /* White hover background needs a dark icon: the SVG uses
+     stroke="currentColor", so a white icon would vanish on white. */
+  background-color: #ffffff;
+  color: #0a0a0c;
 }
 .send-btn:disabled {
   opacity: 0.4;
@@ -609,7 +619,7 @@ body {
   white-space: nowrap;
 }
 .chip:hover {
-  background-color: #475569;
+  background-color: rgba(77, 107, 255, 0.18);
   color: var(--text-primary);
 }
 
@@ -809,7 +819,7 @@ body {
   cursor: pointer;
 }
 .btn-secondary:hover {
-  background-color: #475569;
+  background-color: rgba(77, 107, 255, 0.18);
 }
 
 .system-metadata {
@@ -849,8 +859,8 @@ body {
 
 /* Header pill buttons. */
 .nav-pill {
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(77, 107, 255, 0.12);
+  border: 1px solid rgba(77, 107, 255, 0.4);
   color: var(--accent);
   border-radius: var(--radius-pill);
   padding: 4px 10px;
@@ -863,7 +873,7 @@ body {
   transition: var(--transition);
 }
 .nav-pill:hover {
-  background: rgba(56, 189, 248, 0.22);
+  background: rgba(77, 107, 255, 0.22);
 }
 
 
@@ -919,7 +929,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   letter-spacing: -0.05em;
   line-height: 1;
   text-align: center;
-  color: rgba(245, 241, 232, 0.045);
+  color: rgba(242, 237, 228, 0.045);
   pointer-events: none;
   user-select: none;
   will-change: transform, opacity;
@@ -940,8 +950,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .user-message {
   background: var(--accent-soft) !important;
-  border: 1px solid rgba(183, 166, 245, 0.25) !important;
-  transform: translateZ(12px);
+  border: 1px solid rgba(77, 107, 255, 0.25) !important;
 }
 .assistant-message {
   background: var(--surface) !important;
@@ -949,11 +958,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
 }
 
-/* User bubbles on the lilac-soft surface must read as warm off-white text. */
+/* User bubbles on the blue-soft surface must read as warm off-white text. */
 .user-message .message-header { color: var(--muted) !important; }
 .user-message { color: var(--text) !important; }
 
-/* Scroll progress: thin lilac bar under the header, driven per-pixel. */
+/* Scroll progress: thin blue bar under the header, driven per-pixel. */
 .scroll-progress {
   height: 2px;
   background: transparent;
@@ -976,8 +985,7 @@ body.has-fine-pointer #cursor-glow {
   width: 340px; height: 340px;
   margin: -170px 0 0 -170px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(183, 166, 245, 0.16), rgba(183, 166, 245, 0.04) 45%, transparent 70%);
-  filter: blur(6px);
+  background: radial-gradient(circle, rgba(77, 107, 255, 0.16), rgba(77, 107, 255, 0.04) 45%, transparent 70%);
   pointer-events: none;
   z-index: 1;
 }
@@ -987,7 +995,7 @@ body.has-fine-pointer #cursor-ring {
   left: 0; top: 0;
   width: 34px; height: 34px;
   margin: -17px 0 0 -17px;
-  border: 1px solid rgba(183, 166, 245, 0.55);
+  border: 1px solid rgba(77, 107, 255, 0.55);
   border-radius: 50%;
   pointer-events: none;
   z-index: 2;
@@ -1022,7 +1030,7 @@ body.has-fine-pointer #cursor-ring.is-hover {
 .onboarding li.done .step-num { color: var(--success); }
 
 /* Guided setup wizard: one step at a time, same design family as the
-   landing page (near-black, warm off-white, violet-lilac accent). No
+   landing page (near-black, warm off-white, electric-blue accent). No
    entrance animation — step changes are instant, so reduced-motion needs
    no special handling. */
 .wizard-overlay {
@@ -1044,7 +1052,7 @@ body.has-fine-pointer #cursor-ring.is-hover {
 .wizard-card p { color: var(--muted); font-size: 0.92rem; margin-bottom: 12px; }
 .wizard-card .wizard-steps-list { margin: 0 0 12px 18px; font-size: 0.85rem; color: var(--muted); display: grid; gap: 4px; }
 .wizard-card .wizard-steps-list code { color: var(--text); }
-.wizard-card #wizard-key-input { width: 100%; padding: 0.5rem; background: #121215; border: 1px solid var(--line); border-radius: 6px; color: #f5f1e8; font-size: 0.85rem; }
+.wizard-card #wizard-key-input { width: 100%; padding: 0.5rem; background: #121215; border: 1px solid var(--line); border-radius: 6px; color: #f2ede4; font-size: 0.85rem; }
 .wizard-close {
   position: absolute; top: 10px; right: 12px;
   background: none; border: none; color: var(--muted);
@@ -1062,12 +1070,38 @@ body.has-fine-pointer #cursor-ring.is-hover {
    Full-screen desktop layout + flowing ambient 3D.
    The app used to be a 768px column centred on a black void on laptops.
    On desktop the shell is now full-bleed: header/footer span the viewport
-   while the readable chat column stays centred (960px). The ambient layer
+   while the readable chat column stays centred (1400px). The ambient layer
    is a fixed, pointer-events:none backdrop of drifting orbs at different
    depths (CSS drift + pointer parallax in initMotion). It is decorative
    only: it never covers the input, never intercepts clicks, is hidden on
    touch (pointer: coarse) and under prefers-reduced-motion.
    ========================================================================== */
+/* Starfield: a cheap static layer of tiny dots behind the ambient orbs
+   (the landing page's starfield is a WebGL black-hole canvas — far too
+   heavy for the Companion). Lives inside .app-container so it shows
+   through the transparent chat stream on every screen; the header, footer
+   and message cards all paint above it. No animation, no canvas, no JS. */
+#starfield {
+  position: absolute; inset: 0; z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 8% 12%, rgba(242, 237, 228, 0.9), transparent),
+    radial-gradient(1px 1px at 22% 68%, rgba(242, 237, 228, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 31% 24%, rgba(242, 237, 228, 0.8), transparent),
+    radial-gradient(1px 1px at 44% 82%, rgba(242, 237, 228, 0.5), transparent),
+    radial-gradient(1px 1px at 53% 9%, rgba(242, 237, 228, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 61% 47%, rgba(242, 237, 228, 0.85), transparent),
+    radial-gradient(1px 1px at 69% 74%, rgba(242, 237, 228, 0.55), transparent),
+    radial-gradient(1px 1px at 76% 18%, rgba(242, 237, 228, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 84% 55%, rgba(242, 237, 228, 0.6), transparent),
+    radial-gradient(1px 1px at 92% 33%, rgba(242, 237, 228, 0.8), transparent),
+    radial-gradient(1px 1px at 15% 44%, rgba(77, 107, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 38% 58%, rgba(77, 107, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 58% 88%, rgba(77, 107, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 73% 5%, rgba(77, 107, 255, 0.65), transparent),
+    radial-gradient(1.5px 1.5px at 88% 90%, rgba(77, 107, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 95% 70%, rgba(242, 237, 228, 0.5), transparent);
+}
 #ambient-3d {
   position: fixed; inset: 0; z-index: 0;
   overflow: hidden; pointer-events: none;
@@ -1078,15 +1112,15 @@ body.has-fine-pointer #cursor-ring.is-hover {
   border-radius: 50%; will-change: transform;
 }
 .orb-1 { width: 420px; height: 420px; left: -6%; top: 8%; animation: orb-drift-1 46s ease-in-out infinite alternate; }
-.orb-1 i { background: radial-gradient(circle, rgba(183, 166, 245, 0.28), transparent 65%); filter: blur(50px); }
+.orb-1 i { background: radial-gradient(circle, rgba(77, 107, 255, 0.28), transparent 65%); }
 .orb-2 { width: 340px; height: 340px; right: -4%; top: 22%; animation: orb-drift-2 58s ease-in-out infinite alternate; }
-.orb-2 i { background: radial-gradient(circle, rgba(125, 140, 255, 0.22), transparent 65%); filter: blur(55px); }
+.orb-2 i { background: radial-gradient(circle, rgba(77, 107, 255, 0.22), transparent 65%); }
 .orb-3 { width: 260px; height: 260px; left: 12%; bottom: -6%; animation: orb-drift-3 64s ease-in-out infinite alternate; }
-.orb-3 i { background: radial-gradient(circle, rgba(245, 241, 232, 0.12), transparent 65%); filter: blur(45px); }
+.orb-3 i { background: radial-gradient(circle, rgba(242, 237, 228, 0.12), transparent 65%); }
 .orb-4 { width: 200px; height: 200px; right: 18%; bottom: 12%; animation: orb-drift-1 38s ease-in-out infinite alternate-reverse; }
-.orb-4 i { background: radial-gradient(circle, rgba(183, 166, 245, 0.2), transparent 65%); filter: blur(40px); }
+.orb-4 i { background: radial-gradient(circle, rgba(77, 107, 255, 0.2), transparent 65%); }
 .orb-5 { width: 150px; height: 150px; left: 44%; top: 38%; animation: orb-drift-2 52s ease-in-out infinite alternate; }
-.orb-5 i { background: radial-gradient(circle, rgba(150, 120, 255, 0.18), transparent 65%); filter: blur(36px); }
+.orb-5 i { background: radial-gradient(circle, rgba(77, 107, 255, 0.18), transparent 65%); }
 @keyframes orb-drift-1 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(90px, 60px, 0); } }
 @keyframes orb-drift-2 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-70px, 80px, 0); } }
 @keyframes orb-drift-3 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(60px, -70px, 0); } }
@@ -1096,9 +1130,9 @@ body.has-fine-pointer #cursor-ring.is-hover {
   /* Full-bleed shell; the app container's own background goes transparent
      so the ambient orbs show through around the chat column. */
   .app-container { max-width: none; box-shadow: none; background: transparent; }
-  .app-header { padding-left: max(16px, calc((100vw - 1200px) / 2)); padding-right: max(16px, calc((100vw - 1200px) / 2)); }
-  .chat-stream { padding-left: max(24px, calc((100vw - 960px) / 2)); padding-right: max(24px, calc((100vw - 960px) / 2)); }
-  .app-footer .input-row, .app-footer .quick-chips-scroll { max-width: 960px; width: 100%; margin-left: auto; margin-right: auto; }
+  .app-header { padding-left: max(16px, calc((100vw - 1400px) / 2)); padding-right: max(16px, calc((100vw - 1400px) / 2)); }
+  .chat-stream { padding-left: max(24px, calc((100vw - 1400px) / 2)); padding-right: max(24px, calc((100vw - 1400px) / 2)); }
+  .app-footer .input-row, .app-footer .quick-chips-scroll { max-width: 1400px; width: 100%; margin-left: auto; margin-right: auto; }
 }
 
 /* Account / key settings blocks. */

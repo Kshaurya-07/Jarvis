@@ -1,6 +1,9 @@
 import re
 
-import psutil
+try:
+    import psutil
+except ImportError:  # psutil is not in the serverless bundle (local-only tool)
+    psutil = None  # type: ignore[assignment]
 
 from app.core.config import settings
 from app.core.security import verify_windows_os, UnsupportedPlatformError

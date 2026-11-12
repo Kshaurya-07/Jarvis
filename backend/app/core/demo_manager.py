@@ -42,7 +42,7 @@ DEMO_STEPS = [
     {
         "step": 7,
         "title": "Active Pause / Stop Control",
-        "description": "Tap the visible 'Stop' button during execution to immediately cancel active in-flight requests.",
+        "description": "Stop is not supported in this deployment: the 'Stop' button reports that in-flight requests cannot be cancelled.",
     },
     {
         "step": 8,
@@ -71,7 +71,7 @@ class DemoManager:
             "app_version": __version__,
             "backend_connected": True,
             "gemini_configured": agent_service.is_configured(),
-            "companion_url": "http://127.0.0.1:8000/mobile/",
+            "companion_url": settings.FRONTEND_URL.rstrip("/") + "/mobile/",
             "active_demo_data": {
                 "demo_notes_count": len(demo_notes),
                 "demo_reminders_count": len(demo_reminders),

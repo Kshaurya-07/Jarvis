@@ -23,6 +23,23 @@ from app.tools.browser_automation_tools import (
 
 
 
+# Tools that only work against a physical Windows laptop (workspace
+# files on disk, app launching, hardware status, screenshots). In cloud
+# mode they always fail on Vercel, so they must not be offered to Gemini
+# there — the model would otherwise advertise dead capabilities. They
+# stay registered (and listed by /api/tools) so local mode is unchanged.
+CLOUD_EXCLUDED_TOOLS = frozenset({
+    "list_files",
+    "read_text_file",
+    "open_application",
+    "get_battery_status",
+    "get_storage_status",
+    "get_memory_status",
+    "capture_screenshot",
+    "analyze_screenshot",
+})
+
+
 class ToolRegistry:
     """Central registry for managing agent tools, schema generation, and safe execution."""
 
@@ -53,8 +70,18 @@ class ToolRegistry:
         return list(self._tools.values())
 
     def get_gemini_tool_declarations(self) -> List[Dict[str, Any]]:
-        """Return function declarations formatted for the Gemini API."""
-        return [tool.get_gemini_declaration() for tool in self._tools.values()]
+        """Return function declarations formatted for the Gemini API.
+
+        In cloud mode the local-only tools are excluded: offering them
+        would let Gemini advertise laptop features that cannot work on
+        Vercel.
+        """
+        from app.core.config import settings
+
+        tools = self._tools.values()
+        if settings.CLOUD_MODE:
+            tools = [t for t in tools if t.name not in CLOUD_EXCLUDED_TOOLS]
+        return [tool.get_gemini_declaration() for tool in tools]
 
     def execute_tool(self, name: str, arguments: Dict[str, Any], user=None) -> ToolResult:
         """

@@ -1,16 +1,16 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.34.0
-pydantic>=2.10.0
-pydantic-settings>=2.7.0
-python-dotenv>=1.0.1
-google-genai>=1.0.0
-pytest>=8.3.0
-httpx>=0.28.0
-psutil>=7.0.0
-Pillow>=11.0.0
-google-api-python-client>=2.150.0
-google-auth-oauthlib>=1.2.0
-keyring>=25.0.0
-
-cryptography>=42.0.0
-psycopg[binary]>=3.2.0
+# Serverless bundle (Vercel): only what the API imports at runtime.
+# Pinned to the versions verified in the test venv — do not use >= here,
+# an unpinned deploy can break on a new major release.
+# Dropped on purpose: pytest (dev only), uvicorn (local dev server only),
+# psutil / Pillow / keyring (local-only tools; their imports are guarded
+# so the API boots without them in the serverless bundle).
+fastapi==0.162.4
+pydantic==2.14.3
+pydantic-settings==2.16.2
+python-dotenv==1.2.4
+google-genai==3.0.0
+httpx==0.28.1
+google-api-python-client==2.202.0
+google-auth-oauthlib==1.5.0
+cryptography==50.0.2
+psycopg[binary]==3.3.8

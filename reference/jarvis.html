@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis — One companion. Every device.</title>
+<meta name="description" content="Jarvis is a personal AI companion that lives in the cloud. Sign in with Google, add your own free Gemini key, and chat from any device.">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#000;--fg:#f2ede4;--dim:#77736c;--line:rgba(242,237,228,.12);--blue:#4d6bff;--f:'Inter Tight',system-ui,sans-serif;--m:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.55 var(--f);-webkit-font-smoothing:antialiased}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+main,header,footer{position:relative;z-index:1}
+a{color:inherit;text-decoration:none}a:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top,0px)) 4vw 16px;z-index:5}
+.lg{font-weight:600;letter-spacing:-.02em}
+nav{display:flex;gap:28px;font-size:14px;color:var(--dim)}nav a:hover{color:var(--fg)}
+.btn{display:inline-block;background:var(--fg);color:#000;font-weight:500;padding:12px 22px;border-radius:99px;font-size:15px}
+.btn.s{padding:8px 16px;font-size:14px}
+.ln{margin-left:20px;color:var(--dim);border-bottom:1px solid var(--line)}
+#ch{position:fixed;left:4vw;top:50%;transform:translateY(-50%);margin:0;padding:0;list-style:none;font:12px var(--m);color:var(--dim);z-index:4;counter-reset:c}
+#ch li{counter-increment:c;padding:5px 0;transition:color .3s}#ch li:before{content:"0" counter(c) "  "}#ch li.on{color:var(--fg)}
+.hero{height:100vh;height:100svh;padding:0 6vw 9vh;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
+.tag{font:12px var(--m);color:var(--dim);margin:0 0 18px}
+h1,h2{font-weight:500;letter-spacing:-.045em;line-height:.96;margin:0}
+h1{font-size:clamp(40px,7vw,104px)}h2{font-size:clamp(32px,4.6vw,68px)}
+.hr{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-top:28px}
+.hr p{max-width:420px;margin:0 0 20px;color:#b9b4aa}
+#hud{position:absolute;right:6vw;top:56%;margin:0;font:11px/1.8 var(--m);color:var(--dim);text-align:right}
+#hud div{display:flex;gap:14px;justify-content:flex-end}#hud dt{opacity:.7}#hud dd{margin:0;color:var(--fg)}
+.hint{position:absolute;left:50%;bottom:3.2vh;transform:translateX(-50%);font:11px var(--m);color:var(--dim);margin:0;white-space:nowrap}
+.sec{padding:22vh 6vw}
+.rv{font-size:clamp(24px,3.4vw,46px);line-height:1.18;letter-spacing:-.03em;font-weight:500;max-width:22em;margin:0 0 0 auto}
+.rv span{opacity:.18}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:12vh;border-top:1px solid var(--line);padding-top:28px}
+.stats b{display:block;font-size:clamp(34px,4vw,56px);font-weight:500;letter-spacing:-.04em}.stats span{color:var(--dim);font-size:14px}
+.mq{overflow:hidden;border-block:1px solid var(--line);padding:18px 0;font:13px var(--m);color:var(--dim);white-space:nowrap}
+.mq div{display:inline-block;animation:mq 30s linear infinite}.mq i{font-style:normal;margin:0 28px}
+@keyframes mq{to{transform:translateX(-50%)}}
+#how{height:420vh;position:relative}
+#how .in{position:sticky;top:0;height:100vh;height:100svh;padding:15vh 6vw 8vh}
+#how h2{max-width:8em}
+.st{position:absolute;left:6vw;bottom:9vh;max-width:380px}
+.st span{font:12px var(--m);color:var(--dim)}.st h3{font-size:28px;font-weight:500;letter-spacing:-.03em;margin:8px 0 10px}
+.st p{margin:0 0 12px;color:#b9b4aa}.st .ck{font:12px var(--m);color:var(--blue)}
+#sl{position:absolute;right:6vw;bottom:9vh;list-style:none;margin:0;padding:0;font:12px var(--m);color:var(--dim)}
+#sl li{padding:4px 0 4px 16px;border-left:1px solid var(--line);transition:.3s}#sl li.on{color:var(--fg);border-color:var(--blue)}
+#lbs{position:fixed;inset:0;pointer-events:none;z-index:2}
+.lb{position:absolute;left:0;top:0;font:11px var(--m);background:rgba(0,0,0,.7);border:1px solid rgba(77,107,255,.5);padding:3px 8px;border-radius:4px;white-space:nowrap;transition:opacity .3s}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:8vh}
+.card{border:1px solid var(--line);border-radius:14px;padding:26px;background:rgba(255,255,255,.03);backdrop-filter:blur(6px)}
+.card b{font-size:36px;font-weight:500;letter-spacing:-.04em}.card h3{font-size:16px;margin:14px 0 8px;font-weight:500}.card p{margin:0;font-size:14px;color:#a39f96}
+.cta{text-align:center;padding-bottom:6vh}.cta p{max-width:480px;margin:22px auto 30px;color:#b9b4aa}
+footer{padding:0 6vw}.fm{font-size:29vw;font-weight:600;letter-spacing:-.06em;line-height:.8;height:21vw;overflow:hidden;text-align:center;margin-top:8vh}
+.fn{font:12px var(--m);color:var(--dim);text-align:center;padding:0 0 calc(20px + env(safe-area-inset-bottom,0px))}
+#cur{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;mix-blend-mode:difference;pointer-events:none;z-index:9;transition:width .25s,height .25s,margin .25s}
+@media(pointer:fine){body,a,button{cursor:none}}@media(pointer:coarse){#cur{display:none}}
+@media(max-width:820px){nav,#ch{display:none}.hr{flex-direction:column;align-items:flex-start;gap:0}#hud{top:16%}.stats,.grid{grid-template-columns:1fr 1fr}#sl{display:none}.st{right:6vw}}
+@media(prefers-reduced-motion:reduce){.mq div{animation:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas><div id="cur"></div><div id="lbs" aria-hidden="true"></div>
+<header><a class="lg" href="#top">Jarvis</a><nav><a href="#top">Companion</a><a href="#how">How it works</a><a href="#safety">Safety</a><a href="#access">Access</a></nav><a class="btn s" href="https://jarvis-kumar-shaurya.vercel.app/mobile/">Open Companion</a></header>
+<ol id="ch" aria-label="Chapters"><li data-k="top">Companion</li><li data-k="why">Why</li><li data-k="how">How it works</li><li data-k="safety">Safety</li><li data-k="access">Access</li></ol>
+<main>
+<section id="top" class="hero">
+<p class="tag">New · Cloud-first · Sign in with Google, chat from anywhere</p>
+<h1>One companion.<br>Every device.</h1>
+<div class="hr"><p>Jarvis is a personal AI companion that lives in the cloud — nothing on your laptop. Give a command on your phone, your laptop, or your tablet; your chats, notes and reminders follow your account everywhere.</p><div><a class="btn" href="https://jarvis-kumar-shaurya.vercel.app/mobile/">Open Companion</a><a class="ln" href="#how">See how it works</a></div></div>
+<dl id="hud"><div><dt>Distance</dt><dd><b id="hd" style="font-weight:400">26.0</b> rs</dd></div><div><dt>Mass</dt><dd>1.00 M</dd></div><div><dt>Inclination</dt><dd><b id="hi" style="font-weight:400">84.8</b>°</dd></div></dl>
+<p class="hint">Hold to deepen · Scroll to fall in</p>
+</section>
+<div class="mq" aria-label="Works with Gemini, Neon Postgres, Google Sign-In, Web Speech, FastAPI, Python"><div id="mq"></div></div>
+<section id="why" class="sec">
+<p class="rv" id="rv">The device you speak to should not have to be the device that does the work. Jarvis understands the request, picks the permitted device, explains what it plans to do, does only what is allowed — and says so plainly when something is not built yet.</p>
+<div class="stats"><div><b>26</b><span>Tools in the registry</span></div><div><b>4</b><span>Steps in every task</span></div><div><b>5</b><span>Apps on the launch allowlist</span></div><div><b>43/52</b><span>Routes behind Google sign-in</span></div></div>
+</section>
+<section id="how"><div class="in">
+<h2>What happens after you press enter.</h2>
+<div class="st"><span id="sn"></span><h3 id="sh"></h3><p id="sp"></p><p class="ck" id="sc"></p></div>
+<ul id="sl"><li>Understand</li><li>Choose</li><li>Act</li><li>Report</li></ul>
+</div></section>
+<section id="safety" class="sec">
+<h2>Built to say when it can’t — and to prove what it did.</h2>
+<div class="grid">
+<div class="card"><b>43 / 52</b><h3>Endpoints behind Google sign-in</h3><p>Only the health check, the sign-in flow and the legacy local pairing endpoints are public.</p></div>
+<div class="card"><b>128-bit</b><h3>Confirmation IDs</h3><p>Every state-changing action needs a one-time ID that you approve or deny.</p></div>
+<div class="card"><b>5</b><h3>Apps on the launch allowlist</h3><p>Notepad, Calculator, Paint, File Explorer and Command Prompt. Anything else is refused.</p></div>
+<div class="card"><b>26 / 26</b><h3>Tools write to the audit log</h3><p>Every call is recorded with secrets and file contents redacted. You can export or delete your data.</p></div>
+</div></section>
+<section id="access" class="sec cta">
+<h2>Try it anywhere.</h2>
+<p>Open the web app, sign in with Google, add your free Gemini key. Chat, tools, reminders and notes follow your account on every device.</p>
+<a class="btn" href="https://jarvis-kumar-shaurya.vercel.app/mobile/">Open Companion</a><a class="ln" href="https://github.com/Kshaurya-07/Jarvis">Read the code</a>
+</section>
+</main>
+<footer><div class="fm" aria-hidden="true">Jarvis</div><p class="fn">Jarvis — a personal project. No account, no cloud relay, no telemetry.</p></footer>
+<script>
+const $=s=>document.querySelector(s),cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),lp=(a,b,t)=>a+(b-a)*t;
+const rm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+$('#mq').innerHTML=('Gemini<i>·</i>Neon Postgres<i>·</i>Google Sign-In<i>·</i>Web Speech<i>·</i>FastAPI<i>·</i>Python<i>·</i>').repeat(4);
+/* word reveal */
+const rv=$('#rv'),W=rv.textContent.split(' ');rv.innerHTML=W.map(w=>'<span>'+w+'</span>').join(' ');const ws=[...rv.children];
+/* how steps */
+const ST=[['Understand the request','Jarvis reads what you asked — typed or spoken — and works out what you want and what it is allowed to do. If the request is unclear, it asks instead of guessing.','Check: is the target clear? If not, ask — never guess.'],
+['Choose a permitted action','It checks the request against the allowlist and your permissions. An action that is not permitted is never run silently.','Check: allowed and confirmed? If not, say so.'],
+['Perform supported actions','Only approved actions run, and anything that changes something asks for your confirmation first. You can stop a running task at any time.','Retry: a failed step goes back one step — or stops and reports.'],
+['Show the result','The result comes back to the device you asked from, with a short record of what was done in the activity history.','Check: result reported, action logged. Nothing hidden.']];
+const RN=['Understand','Choose','Act','Report'],RR=[12,8.4,5.6,3.4],lbs=RN.map((n,i)=>{const d=document.createElement('div');d.className='lb';d.textContent='0'+(i+1)+' '+n+' · r'+RR[i].toFixed(1);$('#lbs').appendChild(d);return d});
+let cs=-1;
+/* WebGL */
+const cv=$('#gl'),gl=cv.getContext('webgl',{antialias:false,alpha:false});
+let U={},sm={z:1,e:.09,a:1,ta:1,h:0,s:0,hold:0},tg={},hold=0,blank=0,t0=0;
+if(gl){
+const vs='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+const fs=`precision highp float;uniform vec2 R;uniform float T,E,Z,A,TA,H,S;uniform sampler2D tx;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+vec3 disk(vec2 q,float ri,float ro,float d){float r=length(q);float a=T*.45/(r*sqrt(r)+.05);vec2 p=mat2(cos(a),-sin(a),sin(a),cos(a))*q;
+float b=.5+.5*sin(r*150.+n(p*9.)*5.);float g=n(p*22.)*.6+.4;float m=smoothstep(ri,ri+.02,r)*(1.-smoothstep(ro*.55,ro,r));
+return vec3(1.,.93,.82)*m*b*g*(.05/(r*r+.015))*d;}
+void main(){vec2 u=(gl_FragCoord.xy-.5*R)/R.y;u/=Z;float R0=.15,r=length(u),s=max(sin(E),.04);
+vec2 sp=floor(gl_FragCoord.xy/2.);vec3 c=vec3(step(.9985,h(sp))*(.4+.6*sin(T+h(sp)*40.))*.7);
+vec2 src=u*(1.-1.8*R0*R0/max(r*r,.0001));float w=.9*R.x/R.y;vec2 tv=vec2(src.x/w+.5,src.y/(w*.5)+.5);
+if(tv.x>0.&&tv.x<1.&&tv.y>0.&&tv.y<1.)c+=vec3(.95,.92,.86)*texture2D(tx,tv).r*TA*.9;
+float aw=1.-smoothstep(.2,1.4,E);c+=disk(u,R0*1.04,R0*2.4,1.)*aw*.8+vec3(1.,.93,.82)*smoothstep(.012,0.,abs(r-R0*1.06))*.9;
+c*=smoothstep(R0*.98,R0,r);
+vec2 q=vec2(u.x,u.y/s);float ro=mix(1.5,.62,H);float dop=.6+.8*(.5+.5*clamp(q.x/max(length(q),.01),-1.,1.));
+float fm=u.y<0.?1.:smoothstep(R0*.98,R0*1.02,r);c+=disk(q,.2,ro,dop)*fm;
+for(int i=0;i<4;i++){float f=float(i),ri=mix(.62,.26,f/3.),a=1.-clamp(abs(S-f),0.,1.);float l=smoothstep(.004,0.,abs(length(q)-ri))*(.2+.9*a);
+vec2 dp=ri*vec2(cos(T*.8+f),sin(T*.8+f));l+=smoothstep(.014,0.,length(q-dp))*a*2.;c+=vec3(.3,.42,1.)*l*H*fm;}
+c=1.-exp(-c*1.6);gl_FragColor=vec4(c*A,1.);}`;
+const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o},pr=gl.createProgram();
+gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
+gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const pl=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(pl);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
+['R','T','E','Z','A','TA','H','S'].forEach(k=>U[k]=gl.getUniformLocation(pr,k));
+const tx=gl.createTexture();
+function title(){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.fillStyle='#fff';x.font='600 280px "Inter Tight",system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('Jarvis',512,265);
+gl.bindTexture(gl.TEXTURE_2D,tx);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)}
+title();try{document.fonts.load('600 280px "Inter Tight"').then(title)}catch(e){}
+}
+function size(){if(!gl)return;const q=Math.min(devicePixelRatio||1,1.5)*.8;cv.width=innerWidth*q;cv.height=innerHeight*q;gl.viewport(0,0,cv.width,cv.height)}
+addEventListener('resize',size);size();
+/* scroll targets */
+function targets(){const y=scrollY,vh=innerHeight,hw=$('#how'),ht=hw.offsetTop,hh=hw.offsetHeight-vh,hp=(y-ht)/hh,hero=cl(y/vh);
+const hv=Math.min(cl((y-(ht-vh*.8))/(vh*.8)),1-cl((y-(ht+hh))/(vh*.6))),on=hv>0;
+tg={z:on?1+.25*cl(hp):1+2.2*Math.pow(hero,1.4)+.5*sm.hold*(1-hero),e:on?lp(1.45,.12,cl(hp)):.09,a:on?hv:1-cl((hero-.55)/.45),ta:on?0:1-cl(hero*2.5),h:cl(hv),s:cl(hp)*3};
+return{hero,hp,hv}}
+/* DOM updates */
+function dom(g){const y=scrollY,vh=innerHeight;
+ws.forEach((s,i)=>{});const r=rv.getBoundingClientRect(),p=cl((vh*.85-r.top)/(r.height+vh*.35)),k=p*(ws.length+4);ws.forEach((s,i)=>s.style.opacity=.18+.82*cl(k-i));
+$('#hd').textContent=(26-22*g.hero).toFixed(1);$('#hi').textContent=(90-sm.e*57.3).toFixed(1);
+const i=cl(Math.floor(g.hp*4),0,3);if(i!==cs){cs=i;$('#sn').textContent='Step '+(i+1)+' of 4';$('#sh').textContent=ST[i][0];$('#sp').textContent=ST[i][1];$('#sc').textContent=ST[i][2];[...$('#sl').children].forEach((l,j)=>l.classList.toggle('on',j===i))}
+let ck='top';['top','why','how','safety','access'].forEach(id=>{if($('#'+id).getBoundingClientRect().top<vh*.5)ck=id});document.querySelectorAll('#ch li').forEach(l=>l.classList.toggle('on',l.dataset.k===ck));
+const Hh=innerHeight,Wd=innerWidth;lbs.forEach((l,j)=>{const ri=lp(.62,.26,j/3),a=.35+j*.12,x=Wd/2+ri*Math.cos(a)*sm.z*Hh,yy=Hh/2-ri*Math.sin(a)*Math.max(Math.sin(sm.e),.04)*sm.z*Hh;
+l.style.transform='translate('+x+'px,'+yy+'px)';l.style.opacity=sm.h>.15?(sm.h*(1-Math.min(1,Math.abs(sm.s-j)))*.6+sm.h*.4):0})}
+/* cursor + hold */
+let mx=-99,my=-99,cx=-99,cy=-99;const cu=$('#cur');
+addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY});
+addEventListener('pointerdown',e=>{if(!e.target.closest('a,button')){hold=1;cu.style.width=cu.style.height='64px';cu.style.margin='-32px 0 0 -32px'}});
+addEventListener('pointerup',()=>{hold=0;cu.style.width=cu.style.height='34px';cu.style.margin='-17px 0 0 -17px'});
+/* loop */
+function frame(ts){const g=targets(),k=rm?1:.09;
+for(const q in tg)sm[q]=lp(sm[q],tg[q],k);sm.hold=lp(sm.hold,hold,.06);
+cx=lp(cx,mx,.25);cy=lp(cy,my,.25);cu.style.transform='translate('+cx+'px,'+cy+'px)';dom(g);
+if(gl){if(sm.a<.004){if(!blank){gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);blank=1}}else{blank=0;
+gl.uniform2f(U.R,cv.width,cv.height);gl.uniform1f(U.T,rm?2:ts/1000);gl.uniform1f(U.E,sm.e);gl.uniform1f(U.Z,sm.z);gl.uniform1f(U.A,sm.a);gl.uniform1f(U.TA,sm.ta);gl.uniform1f(U.H,sm.h);gl.uniform1f(U.S,sm.s);gl.drawArrays(gl.TRIANGLES,0,3)}}
+requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
