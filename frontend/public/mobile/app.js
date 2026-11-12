@@ -62,6 +62,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const GATEWAY_URL_KEY = "jarvis_tailscale_gateway_url";
   const API_BASE_URL_KEY = "jarvis_api_base_url";
 
+  // localStorage can throw (private mode, disabled storage) — never let a
+  // settings read break boot. Reads return "" and writes no-op on failure.
+  function safeLocalGet(key) {
+    try { return localStorage.getItem(key) || ""; } catch (_) { return ""; }
+  }
+  function safeLocalSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (_) {}
+  }
+  function safeLocalRemove(key) {
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+
   // Cloud-first: the backend is usually same-origin (Vercel hosts the app
   // and the backend together), so the default base URL is "".
   // window.JARVIS_CONFIG.apiBaseUrl (config.js) or the Settings field below
@@ -69,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function configuredApiBaseUrl() {
     const fromConfig = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.apiBaseUrl || "").trim();
     if (fromConfig) return fromConfig.replace(/\/+$/, "");
-    const fromSettings = (localStorage.getItem(API_BASE_URL_KEY) || "").trim();
+    const fromSettings = safeLocalGet(API_BASE_URL_KEY).trim();
     return fromSettings ? fromSettings.replace(/\/+$/, "") : "";
   }
 
@@ -87,18 +99,25 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.hostname === "[::1]"
   );
 
+  // Cloud endpoints always use the configured/same-origin base. The legacy
+  // Tailscale gateway URL must NEVER leak into cloud calls: a stale gateway
+  // saved in Settings used to hijack every /api/* request (live bug).
   function getBaseUrl() {
-    const configured = configuredApiBaseUrl();
-    if (configured) return configured;
-    if (isLocalhostHost) {
-      return "";
-    }
-    const custom = (remoteGatewayUrlInput?.value || localStorage.getItem(GATEWAY_URL_KEY) || "").trim();
-    return custom ? custom.replace(/\/+$/, "") : "";
+    return configuredApiBaseUrl();
+  }
+
+  // Legacy pairing endpoints only (/api/remote/*). The gateway exists
+  // solely to reach a laptop backend over Tailscale in local mode.
+  function getRemoteBaseUrl() {
+    const custom = (remoteGatewayUrlInput?.value || safeLocalGet(GATEWAY_URL_KEY)).trim();
+    if (custom) return custom.replace(/\/+$/, "");
+    return getBaseUrl();
   }
 
   async function apiFetch(endpoint, options = {}) {
-    const baseUrl = getBaseUrl();
+    // Only legacy /api/remote/* pairing calls may go to the Tailscale
+    // gateway; every other cloud endpoint stays on the configured base.
+    const baseUrl = endpoint.startsWith("/api/remote/") ? getRemoteBaseUrl() : getBaseUrl();
     const url = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
     options.headers = options.headers || {};
     if (remoteSessionToken) {
@@ -125,27 +144,29 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (remoteSessionToken) {
         connectionPill.className = "connection-pill online";
         connectionText.textContent = "Paired (Tailscale)";
-        networkNotice.style.display = "none";
       } else {
-        connectionPill.className = "connection-pill checking";
-        connectionText.textContent = "Reachable (Unpaired)";
-        // NOTE: the sign-in notice is owned by refreshMe() (auth state),
-        // not by the health check. Showing it here made every signed-in
-        // cloud user see "You're not signed in yet" (live bug, 2026-11-11).
+        // Cloud backend answered: the user is online. "Unpaired" is a
+        // local-mode concept only — healthy signed-in cloud users used to
+        // sit here on an amber "Reachable (Unpaired)" pill forever.
+        connectionPill.className = "connection-pill online";
+        connectionText.textContent = "Online";
       }
+      syncSignInPrompts();
 
       if (sysVersion) sysVersion.textContent = data.version || "1.0.0";
-      if (sysPlatform) sysPlatform.textContent = data.platform || "windows";
+      if (sysPlatform) sysPlatform.textContent = data.platform || "—";
       if (sysGemini) sysGemini.textContent = data.gemini_configured ? "Ready" : "No API Key";
       if (sysGoogle) sysGoogle.textContent = data.google_connected ? "Connected" : "Not Connected";
       if (sysToolsCount) sysToolsCount.textContent = (data.active_tools || []).length;
     } catch (e) {
       connectionPill.className = "connection-pill offline";
-      connectionText.textContent = "Offline";
+      connectionText.textContent = "Offline — retrying";
 
-      if (!isLocalhostHost && !remoteSessionToken) {
-        networkNotice.style.display = "flex";
-      }
+      // The sign-in notice is owned by auth state (syncSignInPrompts), not
+      // by the health check: a transient outage must never tell a
+      // signed-in user "You're not signed in yet". The 15s interval
+      // retries the health check.
+      syncSignInPrompts();
     }
   }
 
@@ -164,6 +185,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const keyMessageEl = document.getElementById("key-message");
   const apiBaseUrlInput = document.getElementById("api-base-url-input");
   let meState = { authenticated: false, has_key: false };
+  let meResolved = false; // true once /api/auth/me has answered at least once
+  let noticeDismissed = false; // user closed the sign-in notice this session
   let historyLoaded = false;
 
   function goSignIn() {
@@ -178,6 +201,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const resp = await apiFetch("/api/auth/me", { cache: "no-store" });
       if (!resp.ok) return;
       meState = await resp.json();
+      meResolved = true;
+      // A fresh sign-in clears any earlier "skip setup" dismissal, so the
+      // step-2 (add key) wizard can still reach a user who skipped step 1.
+      if (meState.authenticated) safeLocalRemove(WIZARD_DISMISSED_KEY);
       if (accountSignedOut) accountSignedOut.style.display = meState.authenticated ? "none" : "block";
       if (accountSignedIn) accountSignedIn.style.display = meState.authenticated ? "block" : "none";
       if (accountEmailEl && meState.email) accountEmailEl.textContent = meState.email;
@@ -190,17 +217,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const step2 = document.getElementById("onboard-step-2");
       if (step1) step1.classList.toggle("done", !!meState.authenticated);
       if (step2) step2.classList.toggle("done", !!meState.has_key);
-      // The sign-in notice belongs to auth state: a signed-in user must
-      // never see "You're not signed in yet". Local owners need no sign-in,
-      // so it stays hidden on localhost too. (Before this, refreshMe only
-      // ever SHOWED the notice when unauthenticated and never hid it.)
-      if (networkNotice) networkNotice.style.display = (meState.authenticated || isLocalhostHost) ? "none" : "flex";
       updateWizard();
-      if (onboardBanner) {
-        // The static banner is only the fallback when the wizard is
-        // dismissed; never show both at once.
-        onboardBanner.style.display = (meState.authenticated && meState.has_key) || wizardVisible ? "none" : "block";
-      }
+      syncSignInPrompts();
       if (meState.authenticated && !historyLoaded) {
         historyLoaded = true;
         loadChatHistory();
@@ -246,7 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
       body: JSON.stringify({ api_key: key }),
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.detail || ("HTTP " + resp.status));
+    if (!resp.ok) throw new Error(friendlyDetail(data.detail, "Couldn't save that key — please try again."));
   }
 
   // --- Guided setup wizard: one popup step at a time. ---
@@ -255,6 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const wizardStep2 = document.getElementById("wizard-step-2");
   const wizardStepDone = document.getElementById("wizard-step-done");
   const wizardEyebrowNum = document.getElementById("wizard-eyebrow-num");
+  const wizardEyebrow = document.getElementById("wizard-eyebrow");
   const wizardSigninBtn = document.getElementById("wizard-signin-btn");
   const wizardSaveKeyBtn = document.getElementById("wizard-save-key-btn");
   const wizardKeyInput = document.getElementById("wizard-key-input");
@@ -274,6 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (wizardStep2) wizardStep2.style.display = n === 2 ? "block" : "none";
     if (wizardStepDone) wizardStepDone.style.display = n === 3 ? "block" : "none";
     if (wizardEyebrowNum) wizardEyebrowNum.textContent = n === 3 ? "03" : ("0" + n);
+    if (wizardEyebrow) wizardEyebrow.textContent = "Step " + n + " of 3";
   }
   function updateWizard() {
     if (!wizardOverlay) return;
@@ -290,10 +310,33 @@ document.addEventListener("DOMContentLoaded", () => {
     showWizardStep(step);
   }
   function dismissWizard() {
-    try { localStorage.setItem(WIZARD_DISMISSED_KEY, "1"); } catch (_) {}
+    safeLocalSet(WIZARD_DISMISSED_KEY, "1");
     wizardVisible = false;
     if (wizardOverlay) wizardOverlay.style.display = "none";
-    if (onboardBanner) onboardBanner.style.display = (meState.authenticated && meState.has_key) ? "none" : "block";
+    syncSignInPrompts();
+  }
+
+  // Single owner for every sign-in prompt: wizard, onboarding banner and
+  // network notice are mutually exclusive, priority wizard > banner >
+  // notice. Exactly one shows at a time; after the wizard is dismissed
+  // only the banner shows (never notice + banner stacked).
+  function syncSignInPrompts() {
+    if (wizardVisible) {
+      if (wizardOverlay) wizardOverlay.style.display = "flex";
+      if (onboardBanner) onboardBanner.style.display = "none";
+      if (networkNotice) networkNotice.style.display = "none";
+      return;
+    }
+    if (wizardOverlay) wizardOverlay.style.display = "none";
+    // The static banner is the fallback when the wizard is dismissed or
+    // not wanted; it never shows once setup is complete or on localhost.
+    const setupIncomplete = !(meState.authenticated && meState.has_key);
+    const showBanner = setupIncomplete && !isLocalhostHost;
+    if (onboardBanner) onboardBanner.style.display = showBanner ? "block" : "none";
+    // The notice only shows when the banner is not showing, auth has
+    // confirmed the user is signed out, and the user has not closed it.
+    const showNotice = !showBanner && meResolved && !meState.authenticated && !isLocalhostHost && !remoteSessionToken && !noticeDismissed;
+    if (networkNotice) networkNotice.style.display = showNotice ? "flex" : "none";
   }
   if (wizardSigninBtn) wizardSigninBtn.addEventListener("click", goSignIn);
   if (wizardCloseBtn) wizardCloseBtn.addEventListener("click", dismissWizard);
@@ -303,6 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (wizardOkBtn) wizardOkBtn.addEventListener("click", function () {
     wizardVisible = false;
     if (wizardOverlay) wizardOverlay.style.display = "none";
+    syncSignInPrompts();
     if (commandInput) commandInput.focus();
   });
   if (wizardSaveKeyBtn) wizardSaveKeyBtn.addEventListener("click", async function () {
@@ -317,10 +361,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (wizardKeyMessageEl) wizardKeyMessageEl.textContent = "";
       await refreshMe();
       // Setup just completed: show the "You're good to start" panel.
+      // Step 3 is a one-time post-completion state, shown only here.
       if (meState.authenticated && meState.has_key) {
         wizardVisible = true;
         if (wizardOverlay) wizardOverlay.style.display = "flex";
         showWizardStep(3);
+        syncSignInPrompts();
       }
     } catch (err) {
       if (wizardKeyMessageEl) wizardKeyMessageEl.textContent = "Couldn't save that key: " + err.message;
@@ -361,9 +407,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (apiBaseUrlInput) {
-    apiBaseUrlInput.value = localStorage.getItem(API_BASE_URL_KEY) || "";
+    apiBaseUrlInput.value = safeLocalGet(API_BASE_URL_KEY);
     apiBaseUrlInput.addEventListener("change", () => {
-      localStorage.setItem(API_BASE_URL_KEY, apiBaseUrlInput.value.trim());
+      safeLocalSet(API_BASE_URL_KEY, apiBaseUrlInput.value.trim());
       checkHealth();
       refreshMe();
     });
@@ -382,6 +428,18 @@ document.addEventListener("DOMContentLoaded", () => {
     window.history.replaceState({}, "", window.location.pathname);
   })();
 
+  // Show the setup wizard promptly (~1s) while auth is still pending:
+  // updateWizard() only runs after /api/auth/me resolves, and on a cold
+  // start that can take seconds. The timer shows the shell from the
+  // default (signed-out, no-key) state; refreshMe() corrects the step
+  // when auth lands. Skipped once auth has resolved.
+  setTimeout(function () {
+    if (!meResolved) {
+      updateWizard();
+      syncSignInPrompts();
+    }
+  }, 1000);
+
   // Initial health check and periodic ping
   checkHealth();
   refreshMe();
@@ -389,10 +447,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Load saved gateway URL on initialization (non-sensitive host config)
   if (remoteGatewayUrlInput) {
-    const savedGateway = localStorage.getItem(GATEWAY_URL_KEY) || "";
+    const savedGateway = safeLocalGet(GATEWAY_URL_KEY);
     remoteGatewayUrlInput.value = savedGateway;
     remoteGatewayUrlInput.addEventListener("change", () => {
-      localStorage.setItem(GATEWAY_URL_KEY, remoteGatewayUrlInput.value.trim());
+      safeLocalSet(GATEWAY_URL_KEY, remoteGatewayUrlInput.value.trim());
       checkHealth();
     });
   }
@@ -440,14 +498,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (gateway) {
-        localStorage.setItem(GATEWAY_URL_KEY, gateway);
+        safeLocalSet(GATEWAY_URL_KEY, gateway);
       }
 
       pairSubmitBtn.disabled = true;
       pairSubmitBtn.textContent = "Pairing...";
 
       try {
-        const targetUrl = (getBaseUrl() || "") + "/api/remote/pair/exchange";
+        const targetUrl = (getRemoteBaseUrl() || "") + "/api/remote/pair/exchange";
         const resp = await fetch(targetUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -497,7 +555,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (closeNoticeBtn) {
     closeNoticeBtn.addEventListener("click", () => {
-      networkNotice.style.display = "none";
+      noticeDismissed = true;
+      syncSignInPrompts();
     });
   }
 
@@ -506,18 +565,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const HISTORY_OPT_IN_KEY = "jarvis_history_opt_in";
 
   // Initialize history toggle state (default: OFF / false)
-  const isHistoryOptedIn = localStorage.getItem(HISTORY_OPT_IN_KEY) === "true";
+  const isHistoryOptedIn = safeLocalGet(HISTORY_OPT_IN_KEY) === "true";
   optInHistoryToggle.checked = isHistoryOptedIn;
 
   optInHistoryToggle.addEventListener("change", (e) => {
-    localStorage.setItem(HISTORY_OPT_IN_KEY, e.target.checked ? "true" : "false");
+    safeLocalSet(HISTORY_OPT_IN_KEY, e.target.checked ? "true" : "false");
     if (!e.target.checked) {
-      localStorage.removeItem(HISTORY_KEY);
+      safeLocalRemove(HISTORY_KEY);
     }
   });
 
   clearHistoryBtn.addEventListener("click", () => {
-    localStorage.removeItem(HISTORY_KEY);
+    safeLocalRemove(HISTORY_KEY);
     alert("Local command history has been cleared.");
   });
 
@@ -558,6 +617,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Backend error details can be a string, an object, or missing entirely.
+  // Coerce to a readable string with a friendly fallback — never surface
+  // raw "[object Object]" or "HTTP 5xx" text to the user.
+  function friendlyDetail(detail, fallback) {
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object") {
+      const msg = detail.message || detail.error;
+      if (typeof msg === "string" && msg.trim()) return msg;
+    }
+    return fallback;
+  }
+
   // --- Send Command Workflow ---
   async function handleSendCommand() {
     const text = commandInput.value.trim();
@@ -588,7 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error("Please sign in with Google first — tap Settings, then Sign in with Google.");
         }
         if (response.status === 429) {
-          throw new Error(errData.detail || "Too many requests — please wait a little and try again.");
+          throw new Error(friendlyDetail(errData.detail, "Too many requests — please wait a little and try again."));
         }
         if (response.status === 504 || response.status === 408) {
           // Vercel gateway timeout: the chat function ran past its 10s
@@ -596,7 +667,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // raw "HTTP 504" to the user.
           throw new Error("That took too long — please try again.");
         }
-        throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
+        throw new Error(friendlyDetail(errData.detail, "Something went wrong — please try again."));
       }
 
       const data = await response.json();
@@ -742,6 +813,12 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmation_id: confId, approve }),
       });
+      // Check ok BEFORE parsing: a non-JSON error page used to surface a
+      // raw SyntaxError in the alert below.
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(friendlyDetail(errData.detail, "Couldn't submit that confirmation — please try again."));
+      }
       const res = await resp.json();
       cardEl.innerHTML = `
         <p class="confirmation-desc"><strong>Action ${approve ? "Approved" : "Denied"}:</strong> ${escapeHtml(res.message || "Completed.")}</p>
@@ -919,14 +996,23 @@ document.addEventListener("DOMContentLoaded", () => {
       card.classList.remove("is-tilting");
     }, true);
     // Per-pixel scroll: progress bar + wordmark drift/fade as you scroll.
+    // Throttled through requestAnimationFrame (same pattern as the
+    // pointermove path) — the unthrottled version wrote transform/opacity
+    // on every scroll event.
+    let scrollTicking = false;
     chatStream.addEventListener("scroll", function () {
-      const max = chatStream.scrollHeight - chatStream.clientHeight;
-      const p = max > 0 ? chatStream.scrollTop / max : 0;
-      if (progressFill) progressFill.style.width = (p * 100).toFixed(1) + "%";
-      if (wordmarkEl) {
-        wordmarkEl.style.transform = "translateY(" + (chatStream.scrollTop * -0.08).toFixed(1) + "px)";
-        wordmarkEl.style.opacity = Math.max(0.25, 1 - p * 0.6).toFixed(2);
-      }
+      if (scrollTicking) return;
+      scrollTicking = true;
+      requestAnimationFrame(function () {
+        scrollTicking = false;
+        const max = chatStream.scrollHeight - chatStream.clientHeight;
+        const p = max > 0 ? chatStream.scrollTop / max : 0;
+        if (progressFill) progressFill.style.width = (p * 100).toFixed(1) + "%";
+        if (wordmarkEl) {
+          wordmarkEl.style.transform = "translateY(" + (chatStream.scrollTop * -0.08).toFixed(1) + "px)";
+          wordmarkEl.style.opacity = Math.max(0.25, 1 - p * 0.6).toFixed(2);
+        }
+      });
     }, { passive: true });
   })();
 
@@ -962,7 +1048,10 @@ document.addEventListener("DOMContentLoaded", () => {
     actionsList.innerHTML = '<div class="actions-empty">Loading audit actions...</div>';
     try {
       const resp = await apiFetch("/api/actions?limit=25");
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        if (resp.status === 401) throw new Error("SIGNIN_REQUIRED");
+        throw new Error("LOAD_FAILED");
+      }
       const actions = await resp.json();
 
       if (!Array.isArray(actions) || actions.length === 0) {
@@ -989,7 +1078,10 @@ document.addEventListener("DOMContentLoaded", () => {
         actionsList.appendChild(item);
       });
     } catch (e) {
-      actionsList.innerHTML = `<div class="actions-empty">Failed to load actions: ${escapeHtml(e.message)}</div>`;
+      const msg = e.message === "SIGNIN_REQUIRED"
+        ? "Sign in to see your recent actions"
+        : "Couldn't load recent actions — please try again.";
+      actionsList.innerHTML = `<div class="actions-empty">${escapeHtml(msg)}</div>`;
     }
   }
 });

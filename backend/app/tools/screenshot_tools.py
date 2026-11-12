@@ -1,7 +1,10 @@
 import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:  # Pillow is not in the serverless bundle (local-only tool)
+    Image = None  # type: ignore[assignment]
 
 from app.core.config import settings
 from app.core.confirmation import confirmation_manager
@@ -9,7 +12,7 @@ from app.core.security import verify_windows_os, UnsupportedPlatformError, resol
 from app.tools.base import ToolResult
 
 
-def _grab_primary_display() -> Image.Image:
+def _grab_primary_display() -> "Image.Image":
     """
     Captures primary screen using Pillow ImageGrab or mss.
     Raises RuntimeError if capture is impossible (e.g. locked screen or headless).

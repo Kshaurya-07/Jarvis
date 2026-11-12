@@ -49,6 +49,26 @@ class RemoteSessionManager:
         self._sessions: Dict[str, RemoteSessionInfo] = {}
         self._pairing_failures: Dict[str, List[float]] = defaultdict(list)
 
+    def _purge_expired(self, now: Optional[float] = None) -> None:
+        """Drop stale pairing codes, sessions, and rate-limit entries on
+        every access, so the in-memory dicts never grow without bound.
+        Entries are only purged once they expired over an hour ago:
+        recently expired/used/revoked entries are kept so validation can
+        still report the precise reason ("expired", "already used",
+        "revoked") instead of a generic "invalid"."""
+        now = time.time() if now is None else now
+        grace = now - 3600
+        for code in [c for c, info in self._pairing_codes.items()
+                     if info.expires_at < grace]:
+            self._pairing_codes.pop(code, None)
+        for token in [t for t, s in self._sessions.items()
+                      if s.expires_at < grace]:
+            self._sessions.pop(token, None)
+        window = settings.PAIRING_RATE_LIMIT_WINDOW_SECONDS
+        for ip in [ip for ip, ts in self._pairing_failures.items()
+                   if not [t for t in ts if now - t < window]]:
+            self._pairing_failures.pop(ip, None)
+
     def _clean_rate_limit(self, ip: str, now: float) -> None:
         window = settings.PAIRING_RATE_LIMIT_WINDOW_SECONDS
         self._pairing_failures[ip] = [
@@ -77,6 +97,7 @@ class RemoteSessionManager:
         Generate a 6-digit cryptographically secure pairing code.
         Invalidates any previous active codes to ensure single-code discipline.
         """
+        self._purge_expired()
         now = time.time()
         # Invalidate previous unused codes
         for code_info in self._pairing_codes.values():
@@ -105,6 +126,7 @@ class RemoteSessionManager:
         Exchange a one-time pairing code for an in-memory session token.
         Enforces rate limiting, single-use, and expiration.
         """
+        self._purge_expired()
         now = time.time()
         # 1. Check rate limits
         is_limited, retry_after = self.is_pairing_rate_limited(client_ip)
@@ -169,6 +191,7 @@ class RemoteSessionManager:
         Validate whether a session token is active, not expired, and not revoked.
         Returns (is_valid, failure_reason).
         """
+        self._purge_expired()
         if not token:
             return False, "Missing session token."
 
@@ -185,6 +208,7 @@ class RemoteSessionManager:
         return True, None
 
     def get_session(self, token: Optional[str]) -> Optional[RemoteSessionInfo]:
+        self._purge_expired()
         if not token:
             return None
         return self._sessions.get(token.strip())
@@ -209,6 +233,7 @@ class RemoteSessionManager:
         return count
 
     def get_active_sessions_count(self) -> int:
+        self._purge_expired()
         now = time.time()
         return sum(
             1 for s in self._sessions.values()

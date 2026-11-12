@@ -18,7 +18,7 @@ def test_demo_status_api(client: TestClient):
 
     assert data["demo_version"] == "1.0"
     assert data["backend_connected"] is True
-    assert data["companion_url"] == "http://127.0.0.1:8000/mobile/"
+    assert data["companion_url"] == settings.FRONTEND_URL.rstrip("/") + "/mobile/"
     assert "steps" in data
     assert len(data["steps"]) >= 7
     assert data["steps"][0]["step"] == 1

@@ -5,8 +5,6 @@
    Typography: Inter Tight & JetBrains Mono.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 :root {
   /* Core Palette */
   --bg: #000000;
@@ -16,8 +14,7 @@
   
   --text-primary: #f2ede4;
   --text-secondary: #8a8780;
-  --text-muted: #575550;
-  --text-faint: #383633;
+  --text-muted: #8a8780;
 
   --accent: #4d6bff;
   --accent-rgb: 77, 107, 255;
@@ -65,6 +62,7 @@ body {
   background: var(--bg);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100svh;
   overflow-x: hidden;
   position: relative;
   cursor: default;
@@ -106,6 +104,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100svh;
   z-index: 0;
   pointer-events: none !important;
   background: transparent;
@@ -137,6 +136,11 @@ html.has-pointer .cursor-dot {
 .cursor-dot.is-active {
   width: 52px;
   height: 52px;
+}
+.cursor-dot.is-holding {
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
 }
 @media (pointer: coarse), (hover: none) {
   .cursor-dot { display: none !important; }
@@ -387,6 +391,7 @@ h2 {
    ========================================================================== */
 .hero {
   min-height: 100vh;
+  min-height: 100svh;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -687,17 +692,12 @@ h2 {
   max-width: 980px;
   margin-bottom: 60px;
 }
-.statement-text .word,
 .statement-text .rv-word {
   display: inline-block;
   opacity: 0.18;
   transition: opacity 0.15s ease;
   margin-right: 0.25em;
 }
-.statement-text .word.is-revealed {
-  opacity: 1;
-}
-
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -754,6 +754,7 @@ h2 {
   left: 0;
   width: 100%;
   height: 100vh;
+  height: 100svh;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -1226,6 +1227,11 @@ h2 {
   font-size: 11px;
   padding: 4px 10px;
 }
+.stream-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
 .stream-body {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1628,7 +1634,7 @@ h2 {
   font-weight: 700;
   letter-spacing: -0.06em;
   line-height: 0.8;
-  color: #0c0c10;
+  color: rgba(242, 237, 228, 0.14);
   text-align: center;
   user-select: none;
   pointer-events: none;
@@ -1676,9 +1682,6 @@ h2 {
   }
   .cursor-dot {
     display: none !important;
-  }
-  .statement-text .word {
-    opacity: 1 !important;
   }
 }
 /* Scroll Entry Reveals (Subtle blur-plus-offset with stagger) */

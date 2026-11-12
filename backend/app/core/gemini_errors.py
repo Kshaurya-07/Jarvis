@@ -116,6 +116,28 @@ def is_retryable_gemini_error(exc: BaseException) -> bool:
     return classify_gemini_error(exc)[0] == "gemini_overloaded"
 
 
+async def _call_generate(client, model, contents, config, deadline: Optional[float]):
+    """One model call, capped at ``min(7s, remaining budget)``.
+
+    The SDK client's timeout is fixed at construction, so a retry that
+    starts with 5s of budget left could otherwise run for 7s and overrun
+    the 8s chat budget (and Vercel's 10s function timeout). Running the
+    blocking SDK call in a thread with ``wait_for`` enforces the cap.
+    """
+    remaining = (deadline - time.monotonic()) if deadline is not None else GEMINI_CALL_TIMEOUT_SECONDS
+    timeout = max(0.5, min(GEMINI_CALL_TIMEOUT_SECONDS, remaining))
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                client.models.generate_content,
+                model=model, contents=contents, config=config,
+            ),
+            timeout=timeout,
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        raise TimeoutError("Gemini call exceeded its per-call time budget") from None
+
+
 async def generate_content_with_retry(
     client,
     *,
@@ -148,9 +170,7 @@ async def generate_content_with_retry(
         if time.monotonic() > deadline - 1.0:
             raise TimeoutError("Gemini call exceeded the chat time budget")
         try:
-            return client.models.generate_content(
-                model=model, contents=contents, config=config
-            )
+            return await _call_generate(client, model, contents, config, deadline)
         except Exception as exc:  # noqa: BLE001 — classified by the caller
             last_exc = exc
             if not is_retryable_gemini_error(exc):
@@ -178,9 +198,7 @@ async def generate_content_with_retry(
             model,
             fallback_model,
         )
-        return client.models.generate_content(
-            model=fallback_model, contents=contents, config=config
-        )
+        return await _call_generate(client, fallback_model, contents, config, deadline)
 
     assert last_exc is not None  # a loop iteration always ran or raised
     raise last_exc

@@ -34,9 +34,14 @@ TAILSCALE_HOST_REGEX = re.compile(
     r"^([a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.ts\.net|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$"
 )
 
-# Vercel deployment hosts (*.vercel.app) — the backend itself runs on Vercel
-# in cloud mode, so its own Host header is a vercel.app domain.
-VERCEL_HOST_REGEX = re.compile(r"^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.vercel\.app(:\d+)?$")
+# Vercel deployment hosts — restricted to this project's own domains, not
+# any *.vercel.app. The backend runs on jarvis-kumar-shaurya.vercel.app,
+# with jarvis-eta-ten-83.vercel.app as the verified preview, plus
+# *-kumar-shaurya* preview hostnames for this project.
+VERCEL_HOST_REGEX = re.compile(
+    r"^(jarvis-kumar-shaurya\.vercel\.app|jarvis-eta-ten-83\.vercel\.app|"
+    r"[a-zA-Z0-9-]*kumar-shaurya[a-zA-Z0-9-]*\.vercel\.app)(:\d+)?$"
+)
 
 
 def is_allowed_origin(origin: str) -> bool:
@@ -139,8 +144,13 @@ app = FastAPI(
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):
     """
-    Enforces maximum payload size from Content-Length header to prevent DOS/memory exhaustion.
-    Returns 413 if content-length exceeds MAX_REQUEST_BODY_BYTES.
+    Enforces maximum payload size to prevent DOS/memory exhaustion.
+    Checks Content-Length first (cheap reject), then enforces while
+    actually reading the body — a lying or missing Content-Length must
+    not let an oversized body through. The body is re-attached to the
+    request afterwards (Starlette's cached-request replay), so downstream
+    handlers still see it. Returns 413 if the body exceeds
+    MAX_REQUEST_BODY_BYTES.
     """
     content_length = request.headers.get("content-length")
     if content_length:
@@ -158,6 +168,26 @@ async def request_size_limit_middleware(request: Request, call_next):
                 )
         except ValueError:
             pass
+    # Enforce on the actual bytes read (bounded accumulation: abort as
+    # soon as the limit is crossed, so a lying header cannot OOM us).
+    body = b""
+    try:
+        async for chunk in request.stream():
+            if len(body) + len(chunk) > settings.MAX_REQUEST_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": (
+                            f"Request entity too large. Maximum allowed size is "
+                            f"{settings.MAX_REQUEST_BODY_BYTES} bytes."
+                        )
+                    },
+                )
+            body += chunk
+    except Exception:
+        # A disconnect mid-read: let the downstream handler deal with it.
+        return await call_next(request)
+    request._body = body  # type: ignore[attr-defined]
     return await call_next(request)
 
 

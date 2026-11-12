@@ -38,7 +38,7 @@ to share passwords or API keys in chat.
   everything syncs. No laptop, no localhost, no install. Local dev still
   works with zero setup (see "Local development" below).
 - **Chat with tool calling** — Gemini (default `gemini-3.8-flash`, called
-  with *your* key) calls tools over up to 5 turns. If you have not saved
+  with *your* key) calls tools over up to 3 turns. If you have not saved
   a key yet, chat tells you plainly how to add one instead of failing
   cryptically.
 - **Files and notes** — `list_files`, `read_text_file` (sandboxed to

@@ -42,7 +42,7 @@ def test_chat_without_api_key(client):
     # user-friendly prompt to add their own free key rather than crashing.
     # There is deliberately no server/owner key fallback.
     response = client.post("/api/chat", json={"message": "What files do I have?"})
-    assert response.status_code == 200
+    assert response.status_code == 400  # no Gemini key saved: proper 400, success:false body kept
     data = response.json()
     assert data["success"] is False
     assert "Gemini key" in data["reply"]

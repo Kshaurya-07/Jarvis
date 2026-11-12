@@ -284,7 +284,7 @@ def test_remote_origin_requires_session_token_for_data_endpoints(client: TestCli
 
 
 def test_remote_stop_endpoint(client: TestClient):
-    """Remote stop endpoint promptly halts active tasks."""
+    """Remote stop honestly reports that stopping is not supported."""
     code = remote_session_manager.generate_pairing_code()
     session = remote_session_manager.exchange_pairing_code(code, "127.0.0.1")
 
@@ -296,8 +296,8 @@ def test_remote_stop_endpoint(client: TestClient):
         }
     )
     assert stop_resp.status_code == 200
-    assert stop_resp.json()["stopped"] is True
-    assert "aborted" in stop_resp.json()["message"]
+    assert stop_resp.json()["stopped"] is False
+    assert "not supported" in stop_resp.json()["message"]
 
 
 def test_backend_security_architecture_binding_and_no_relay():

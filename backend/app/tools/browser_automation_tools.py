@@ -24,14 +24,15 @@ def browser_navigate(
     Requires explicit user confirmation before executing any navigation.
     Strictly rejects any URL that does not belong to the approved domain.
     """
-    # 1. Validate approved domain
-    if not browser_manager.is_approved(approved_domain):
+    # 1. Validate approved domain (per user)
+    _u = get_current_user()
+    if not browser_manager.is_approved(approved_domain, user=_u):
         return ToolResult(
             success=False,
             error=(
                 f"Domain '{approved_domain}' is not approved. Please select or approve this domain "
                 f"first via the extension or /api/browser/approve-domain. Approved domains are: "
-                f"{browser_manager.get_approved_domains()}"
+                f"{browser_manager.get_approved_domains(user=_u)}"
             ),
         )
 
@@ -42,7 +43,6 @@ def browser_navigate(
         return ToolResult(success=False, error=str(e))
 
     # 3. Check confirmation
-    _u = get_current_user()
     if not confirmation_id:
         pending = confirmation_manager.create_pending_action(
             tool_name="browser_navigate",
@@ -77,13 +77,19 @@ def browser_navigate(
             error=f"Confirmation token '{confirmation_id}' is invalid, expired, or has not been approved yet."
         )
 
+    # The server has no live browser: a confirmed navigation is STAGED for
+    # the Jarvis browser extension, which applies it on the user's machine.
+    # Never claim the browser "navigated" — this only records the request.
     return ToolResult(
         success=True,
         output={
-            "status": "navigated",
+            "status": "pending_extension",
             "url": clean_url,
             "approved_domain": approved_domain,
-            "message": f"Successfully navigated to '{clean_url}'.",
+            "message": (
+                f"Navigation to '{clean_url}' is staged for the browser extension "
+                "and will happen when the extension applies it."
+            ),
             "read_only": False,
         },
     )
@@ -98,7 +104,7 @@ def browser_read_page(
     Low-risk tool to read visible text from the active page within an approved domain.
     Enforces domain restrictions, strips hidden elements, and treats page content as untrusted input.
     """
-    if not browser_manager.is_approved(approved_domain):
+    if not browser_manager.is_approved(approved_domain, user=get_current_user()):
         return ToolResult(
             success=False,
             error=f"Domain '{approved_domain}' is not approved by the user.",
@@ -153,8 +159,8 @@ def browser_fill_field(
     3. Requires explicit confirmation before filling any field.
     4. The final form submission MUST be done manually by the user.
     """
-    # 1. Validate approved domain
-    if not browser_manager.is_approved(approved_domain):
+    # 1. Validate approved domain (per user)
+    if not browser_manager.is_approved(approved_domain, user=get_current_user()):
         return ToolResult(
             success=False,
             error=f"Domain '{approved_domain}' is not approved by the user.",
@@ -231,13 +237,20 @@ def browser_fill_field(
             error=f"Confirmation token '{confirmation_id}' is invalid, expired, or has not been approved yet."
         )
 
+    # The server has no live browser: a confirmed fill is STAGED for the
+    # Jarvis browser extension, which applies it on the user's machine.
+    # Never claim the field was filled — this only records the request.
     return ToolResult(
         success=True,
         output={
-            "status": "field_filled",
+            "status": "pending_extension",
             "selector": clean_selector,
             "approved_domain": approved_domain,
-            "note": "Field filled successfully. Notice: Final submission must be completed manually by you; the agent does not submit forms.",
+            "message": (
+                "Fill is staged for the browser extension and will happen "
+                "when the extension applies it."
+            ),
+            "note": "Notice: Final submission must be completed manually by you; the agent does not submit forms.",
             "read_only": False,
         },
     )

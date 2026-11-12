@@ -44,6 +44,21 @@
     }
   }
 
+  // In-page anchor links: route through Lenis instead of native jumps
+  // (guarded — if Lenis is absent the browser's native jump still works).
+  document.addEventListener("click", function (e) {
+    if (!lenisInstance) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var id = a.getAttribute("href");
+    if (!id || id.length < 2) return;
+    var target = document.querySelector(id);
+    if (!target) return;
+    e.preventDefault();
+    lenisInstance.scrollTo(target);
+  });
+
   // ==========================================================================
   // 2. RAW WEBGL GRAVITATIONAL LENSING & 3D JOURNEY
   // ==========================================================================
@@ -129,7 +144,7 @@
     "    c += vec3(0.95, 0.92, 0.86) * texture2D(tx, tv).r * TA * 0.9;",
     "  }",
     "  float aw = 1.0 - smoothstep(0.2, 1.4, E);",
-    "  c += disk(u, R0 * 1.04, R0 * 2.4, 1.0) * aw * 0.8 + vec3(1.0, 0.93, 0.82) * smoothstep(0.012, 0.0, abs(r - R0 * 1.06)) * 0.9;",
+    "  c += disk(u, R0 * 1.04, R0 * 2.4, 1.0) * aw * 0.8 + vec3(1.0, 0.93, 0.82) * (1.0 - smoothstep(0.0, 0.012, abs(r - R0 * 1.06))) * 0.9;",
     "  c *= smoothstep(R0 * 0.98, R0, r);",
     "  vec2 q = vec2(u.x, u.y / s);",
     "  float ro = mix(1.5, 0.62, H);",
@@ -138,9 +153,9 @@
     "  c += disk(q, 0.2, ro, dop) * fm;",
     "  for (int i = 0; i < 4; i++) {",
     "    float f = float(i), ri = mix(0.62, 0.26, f / 3.0), a = 1.0 - clamp(abs(S - f), 0.0, 1.0);",
-    "    float l = smoothstep(0.004, 0.0, abs(length(q) - ri)) * (0.2 + 0.9 * a);",
+    "    float l = (1.0 - smoothstep(0.0, 0.004, abs(length(q) - ri))) * (0.2 + 0.9 * a);",
     "    vec2 dp = ri * vec2(cos(T * 0.8 + f), sin(T * 0.8 + f));",
-    "    l += smoothstep(0.014, 0.0, length(q - dp)) * a * 2.0;",
+    "    l += (1.0 - smoothstep(0.0, 0.014, length(q - dp))) * a * 2.0;",
     "    c += vec3(0.3, 0.42, 1.0) * l * H * fm;",
     "  }",
     "  c = 1.0 - exp(-c * 1.6);",
@@ -186,7 +201,7 @@
     gl.enableVertexAttribArray(pl);
     gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 0, 0);
 
-    ["R", "T", "E", "Z", "A", "TA", "H", "S"].forEach(function (k) {
+    ["R", "T", "E", "Z", "A", "TA", "H", "S", "tx"].forEach(function (k) {
       uniforms[k] = gl.getUniformLocation(webglProgram, k);
     });
 
@@ -195,8 +210,8 @@
 
     if (document.fonts) {
       try {
-        document.fonts.load('600 280px "Inter Tight"').then(renderTextTexture);
-        if (document.fonts.ready) document.fonts.ready.then(renderTextTexture);
+        document.fonts.load('600 280px "Inter Tight"').then(renderTextTexture).catch(function () {});
+        if (document.fonts.ready) document.fonts.ready.then(renderTextTexture).catch(function () {});
       } catch (e) {}
     }
   }
@@ -326,39 +341,47 @@
   }
 
   // ==========================================================================
-  // 4. MOUSE / TOUCH HOLD & PARALLAX
+  // 4. MOUSE HOLD & PARALLAX (mouse pointers only — hold is disabled on
+  // touch/pen so it can never stick, and never starts over the chart or
+  // code panels)
   // ==========================================================================
+  var cursorDot = document.getElementById("cursor-dot");
+
+  function releaseHold() {
+    isHolding = false;
+    if (cursorDot) cursorDot.classList.remove("is-holding");
+  }
+
   window.addEventListener("pointerdown", function (e) {
-    if (e.target.closest("a, button, input, textarea, select, [role='button'], .tab-btn")) return;
+    if (e.pointerType !== "mouse") return;
+    if (e.target.closest("a, button, input, textarea, select, [role='button'], .tab-btn, .chart-wrap, .code-window, .streaming-log-panel")) return;
     isHolding = true;
-    if (cursorDot) {
-      cursorDot.style.width = "64px";
-      cursorDot.style.height = "64px";
-      cursorDot.style.margin = "-32px 0 0 -32px";
-    }
+    if (cursorDot) cursorDot.classList.add("is-holding");
   });
 
-  window.addEventListener("pointerup", function () {
-    isHolding = false;
-    if (cursorDot) {
-      cursorDot.style.width = "34px";
-      cursorDot.style.height = "34px";
-      cursorDot.style.margin = "-17px 0 0 -17px";
-    }
-  });
+  window.addEventListener("pointerup", releaseHold);
+  window.addEventListener("pointercancel", releaseHold);
+  window.addEventListener("blur", releaseHold);
 
   // ==========================================================================
   // 5. WORD-BY-WORD SCROLL REVEAL (Zero DOM reflow)
   // ==========================================================================
+  var lastRevealP = null;
   function updateWordReveal(y) {
     if (!whyStatement || !whyWords.length) return;
     if (prefersReducedMotion) {
+      if (lastRevealP === "reduced") return;
+      lastRevealP = "reduced";
       whyWords.forEach(function (w) { w.style.opacity = "1"; });
       return;
     }
     var vh = cachedVh;
     var rTop = cachedStatementTop - y;
+    if (rTop > vh || rTop + cachedStatementHeight < 0) return; // statement off-screen
     var p = clamp((vh * 0.85 - rTop) / (cachedStatementHeight + vh * 0.35), 0, 1);
+    var pKey = p.toFixed(3);
+    if (pKey === lastRevealP) return; // nothing changed since last frame
+    lastRevealP = pKey;
     var kWord = p * (whyWords.length + 4);
     whyWords.forEach(function (w, i) {
       w.style.opacity = (0.18 + 0.82 * clamp(kWord - i, 0, 1)).toFixed(2);
@@ -368,6 +391,7 @@
   // ==========================================================================
   // 6. CHAPTER NAVIGATION SCROLL-SPY (Zero DOM reflow)
   // ==========================================================================
+  var lastChapterId = null;
   function updateChapterNav(y) {
     var vh = cachedVh;
     var activeId = "companion";
@@ -378,6 +402,8 @@
         activeId = chId;
       }
     }
+    if (activeId === lastChapterId) return; // active chapter unchanged
+    lastChapterId = activeId;
     chapterNavLinks.forEach(function (link) {
       link.classList.toggle("is-active", link.getAttribute("data-chapter") === activeId);
     });
@@ -386,7 +412,6 @@
   // ==========================================================================
   // 7. CUSTOM DIFFERENCE CURSOR (34px, lerp smoothed)
   // ==========================================================================
-  var cursorDot = document.getElementById("cursor-dot");
   var mouseX = -999, mouseY = -999;
   var curX = -999, curY = -999;
 
@@ -407,6 +432,29 @@
   // 8. UNIFIED RENDER & RAF LOOP (Synchronized 60/120fps)
   // ==========================================================================
   var currentStepIdx = -1;
+  var lastHudDist = null;
+  var lastHudInc = null;
+  var lastHeroOpacity = null;
+  var lastRailHeight = null;
+  var lastBadgeH = null;
+
+  // Pause the rAF loop entirely while the tab is hidden; resume on return.
+  var rafId = null;
+  var rafRunning = false;
+  function startLoop() {
+    if (rafRunning || document.hidden) return;
+    rafRunning = true;
+    rafId = requestAnimationFrame(frame);
+  }
+  function stopLoop() {
+    rafRunning = false;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) stopLoop();
+    else startLoop();
+  });
 
   function frame(timestamp) {
     // 1. Advance Lenis smooth scroll within the exact same frame
@@ -430,20 +478,18 @@
       cursorDot.style.transform = "translate3d(" + curX.toFixed(1) + "px, " + curY.toFixed(1) + "px, 0)";
     }
 
-    // 4. Hero HUD & Blur/Fade on scroll out
+    // 4. Hero HUD & fade on scroll out (opacity only — no per-frame blur)
     if (hudDist) {
-      var dVal = Math.max((26.0 - 22.0 * state.hero) - sm.hold * 4.0, 1.2);
-      hudDist.textContent = dVal.toFixed(1);
+      var dVal = Math.max((26.0 - 22.0 * state.hero) - sm.hold * 4.0, 1.2).toFixed(1);
+      if (dVal !== lastHudDist) { lastHudDist = dVal; hudDist.textContent = dVal; }
     }
     if (hudInc) {
-      var incDeg = 90.0 - sm.e * 57.2958;
-      hudInc.textContent = incDeg.toFixed(1);
+      var incDeg = (90.0 - sm.e * 57.2958).toFixed(1);
+      if (incDeg !== lastHudInc) { lastHudInc = incDeg; hudInc.textContent = incDeg; }
     }
     if (heroCentre) {
-      var heroOpacity = Math.max(0, 1.0 - state.hero * 1.8);
-      var heroBlur = state.hero * 8.0;
-      heroCentre.style.opacity = heroOpacity.toFixed(2);
-      heroCentre.style.filter = heroBlur > 0.1 ? "blur(" + heroBlur.toFixed(1) + "px)" : "none";
+      var heroOpacity = Math.max(0, 1.0 - state.hero * 1.8).toFixed(2);
+      if (heroOpacity !== lastHeroOpacity) { lastHeroOpacity = heroOpacity; heroCentre.style.opacity = heroOpacity; }
     }
 
     // 5. How It Works Step Swaps & Rail Fill
@@ -458,13 +504,17 @@
       });
     }
     if (railFill) {
-      railFill.style.height = (state.hp * 100).toFixed(1) + "%";
+      var railH = (state.hp * 100).toFixed(1) + "%";
+      if (railH !== lastRailHeight) { lastRailHeight = railH; railFill.style.height = railH; }
     }
 
-    // 6. Screen-Projected 3D Orbit Badges
+    // 6. Screen-Projected 3D Orbit Badges (skipped while the How section is
+    // off-screen — badges are invisible there anyway)
     var winH = cachedVh;
     var winW = cachedVw;
-    orbitBadges.forEach(function (badge, j) {
+    var badgesVisible = sm.h > 0.01 || (lastBadgeH !== null && lastBadgeH > 0.01);
+    lastBadgeH = sm.h;
+    if (badgesVisible) orbitBadges.forEach(function (badge, j) {
       var ri = lerp(0.62, 0.26, j / 3.0);
       var ang = 0.35 + j * 0.12;
       var bx = winW / 2.0 + ri * Math.cos(ang) * sm.z * winH;
@@ -498,7 +548,7 @@
         if (textTexture) {
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, textTexture);
-          gl.uniform1i(gl.getUniformLocation(webglProgram, "tx"), 0);
+          gl.uniform1i(uniforms.tx, 0);
         }
 
         gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -508,16 +558,38 @@
     updateWordReveal(state.scrollY);
     updateChapterNav(state.scrollY);
 
-    requestAnimationFrame(frame);
+    // 7. WebGL canvas work is already skipped once fully faded (sm.a < 0.004
+    // above), which is exactly when the hero is off-screen.
+    if (rafRunning) requestAnimationFrame(frame);
   }
 
   // ==========================================================================
   // 9. TABS (Capabilities Comparison)
   // ==========================================================================
+  // Shared roving-tabindex + arrow-key navigation for every tablist.
+  function initTabKeyboard(btns) {
+    if (!btns.length) return;
+    btns.forEach(function (btn, idx) {
+      btn.tabIndex = btn.classList.contains("is-active") ? 0 : -1;
+      btn.addEventListener("keydown", function (ev) {
+        var next = null;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") next = btns[(idx + 1) % btns.length];
+        else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") next = btns[(idx - 1 + btns.length) % btns.length];
+        else if (ev.key === "Home") next = btns[0];
+        else if (ev.key === "End") next = btns[btns.length - 1];
+        if (next) { ev.preventDefault(); next.focus(); next.click(); }
+      });
+    });
+  }
+  function syncRoving(btns) {
+    btns.forEach(function (b) { b.tabIndex = b.classList.contains("is-active") ? 0 : -1; });
+  }
+
   function initTabs(tablist) {
     if (!tablist) return;
     var btns = Array.prototype.slice.call(tablist.querySelectorAll(".tab-btn[data-tab]"));
     if (!btns.length) return;
+    initTabKeyboard(btns);
     btns.forEach(function (btn) {
       btn.addEventListener("click", function () {
         btns.forEach(function (b) {
@@ -525,6 +597,7 @@
           b.classList.toggle("is-active", active);
           b.setAttribute("aria-selected", active ? "true" : "false");
         });
+        syncRoving(btns);
         btns.forEach(function (b) {
           var panel = document.getElementById(b.getAttribute("data-tab"));
           if (!panel) return;
@@ -545,6 +618,7 @@
   // 10. TOOLS CHART WITH SCRUBBER & LIVE TOOLTIP
   // ==========================================================================
   var chartSvg = document.getElementById("tools-chart-svg");
+  var chartRect = null; // cached getBoundingClientRect; invalidated on resize/scroll
   var chartTip = document.getElementById("chart-tooltip");
   var chartCursor = document.getElementById("chart-cursor");
   var chartScrubber = document.getElementById("chart-scrubber-line");
@@ -566,8 +640,9 @@
 
   if (chartSvg && chartTip && chartCursor) {
     function updateScrubber(ev) {
-      var rect = chartSvg.getBoundingClientRect();
-      var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      if (!chartRect) chartRect = chartSvg.getBoundingClientRect();
+      var rect = chartRect;
+      var clientX = ev.clientX;
       var svgX = ((clientX - rect.left) / rect.width) * 720;
       var nearest = chartData[0];
       chartData.forEach(function (d) {
@@ -590,12 +665,14 @@
 
       chartTip.hidden = false;
       chartTip.textContent = nearest.label + ": " + nearest.tools + " tools · running total " + nearest.total;
-      chartTip.style.left = ((nearest.x / 720) * 100) + "%";
+      chartTip.style.left = clamp((nearest.x / 720) * 100, 10, 90) + "%";
       chartTip.style.top = ((chartY(nearest.tools) / 340) * 100) + "%";
     }
 
     chartSvg.addEventListener("pointermove", updateScrubber);
-    chartSvg.addEventListener("touchmove", updateScrubber, { passive: true });
+    // Pointer events cover touch too — a separate touchmove listener would
+    // double-fire updateScrubber on touch devices.
+    window.addEventListener("scroll", function () { chartRect = null; }, { passive: true });
     chartSvg.addEventListener("pointerleave", function () {
       chartCursor.setAttribute("opacity", "0");
       if (chartScrubber) chartScrubber.setAttribute("opacity", "0");
@@ -632,6 +709,7 @@
     }, 16);
   }
 
+  initTabKeyboard(codeBtns);
   codeBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
       activeCode = btn.getAttribute("data-code");
@@ -640,12 +718,31 @@
         b.classList.toggle("is-active", active);
         b.setAttribute("aria-selected", active ? "true" : "false");
       });
+      syncRoving(codeBtns);
       typeCode(activeCode);
       if (copyNote) copyNote.textContent = "Health check against the cloud backend. No key needed for /api/health.";
       if (copyBtn) copyBtn.textContent = "Copy code";
     });
   });
-  if (codeText) typeCode("curl");
+  (function () {
+    var codeWindow = document.querySelector(".code-window");
+    var codeTyped = false;
+    function typeCodeWhenVisible() {
+      if (codeTyped || !codeText) return;
+      codeTyped = true;
+      typeCode("curl");
+    }
+    if (codeWindow && "IntersectionObserver" in window) {
+      var codeObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) { typeCodeWhenVisible(); codeObs.unobserve(entry.target); }
+        });
+      }, { threshold: 0.2 });
+      codeObs.observe(codeWindow);
+    } else {
+      typeCodeWhenVisible();
+    }
+  })();
 
   if (copyBtn) {
     copyBtn.addEventListener("click", function () {
@@ -678,12 +775,12 @@
   var streamReplayBtn = document.getElementById("stream-replay-btn");
   var streamLines = [
     "> GET /api/health HTTP/1.1",
-    "< 200 OK {\"status\": \"ok\", \"service\": \"jarvis-cloud\", \"tools\": 26, \"tests\": 181}",
+    "< 200 OK {\"status\": \"ok\", \"service\": \"jarvis-cloud\", \"tools\": 26, \"tests\": 218}",
     "> POST /api/chat {\"message\": \"Check device status and read latest note\"}",
     "< 200 OK [step 01 · understand] intent=\"status_check\" target=\"laptop\" permitted=true",
     "< 200 OK [step 02 · choose] selected_tool=\"get_device_status\" confirmation_required=false",
-    "< 200 OK [step 03 · act] tool=\"get_device_status\" executed=true payload={\"battery\": \"92%\"}",
-    "< 200 OK [step 04 · report] result=\"Laptop is online at 92% battery; audit log entry #284 written.\""
+    "< 200 OK [step 03 · act] tool=\"get_device_status\" executed=true payload={\"battery\": \"92% (sample)\"}",
+    "< 200 OK [step 04 · report] result=\"Sample device status: battery 92% (sample value); audit log entry #000 (sample).\""
   ];
   var streamPlayed = false;
   var streamInterval = null;
@@ -741,19 +838,23 @@
   }
   try {
     var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, 1500);
+    var timer = setTimeout(function () { controller.abort(); }, 8000);
     fetch("/api/health", { signal: controller.signal, cache: "no-store" })
       .then(function (resp) {
         clearTimeout(timer);
         if (resp.ok) {
           setStatus("ok", "Cloud backend is up — sign in to start.");
         } else {
-          setStatus("off", "Cloud backend not reachable right now — try again in a moment.");
+          setStatus("off", "Cloud backend returned an error.");
         }
       })
-      .catch(function () {
+      .catch(function (err) {
         clearTimeout(timer);
-        setStatus("off", "Cloud backend not reachable right now — try again in a moment.");
+        if (err && err.name === "AbortError") {
+          setStatus("off", "Cloud backend is taking a while to respond — try again in a moment.");
+        } else {
+          setStatus("off", "Cloud backend not reachable right now — try again in a moment.");
+        }
       });
   } catch (e) {
     setStatus("off", "Backend status unavailable — try again in a moment.");
@@ -824,16 +925,21 @@
   resizeWebGL();
   updateCachedMetrics();
 
+  var resizeTimer = null;
   window.addEventListener("resize", function () {
-    resizeWebGL();
-    renderTextTexture();
-    updateCachedMetrics();
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      resizeTimer = null;
+      resizeWebGL();
+      updateCachedMetrics();
+      chartRect = null; // chart rect is re-measured on next pointermove
+    }, 150);
   }, { passive: true });
 
   window.addEventListener("load", function () {
     updateCachedMetrics();
   });
 
-  requestAnimationFrame(frame);
+  startLoop();
 
 })();

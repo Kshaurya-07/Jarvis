@@ -18,7 +18,7 @@ class SearchResultItem(BaseModel):
     publication_date: Optional[str] = None
 
 
-async def execute_web_search(query: str, max_results: int = 5) -> ToolResult:
+async def execute_web_search(query: str, max_results: int = 5, user=None) -> ToolResult:
     """
     Execute a web search using an official search provider API (Tavily, Google Custom Search, or Brave).
     Validates arguments, screens queries against sensitive credential leakage, and formats structured results with citations.
@@ -63,6 +63,26 @@ async def execute_web_search(query: str, max_results: int = 5) -> ToolResult:
                 "Web search is not configured on this Jarvis instance. "
                 "Please configure SEARCH_API_KEY in your .env file to enable web search."
             ),
+        )
+
+    # 4b. Per-user search cap: searches spend the owner's shared
+    # SEARCH_API_KEY, so each user gets their own guard. Enforced before
+    # the provider is called.
+    try:
+        from app.core.usage_limiter import usage_limiter
+        from app.core.user_context import get_current_user, resolve_user
+        from fastapi import HTTPException
+
+        usage_limiter.check_and_record(resolve_user(user or get_current_user()), kind="search")
+    except HTTPException as e:
+        return ToolResult(
+            success=False,
+            error=f"Search limit reached: {e.detail}",
+        )
+    except Exception as e:
+        return ToolResult(
+            success=False,
+            error=f"Could not check the search usage limit: {e}",
         )
 
     provider = (settings.SEARCH_PROVIDER or "tavily").strip().lower()
@@ -235,14 +255,20 @@ def web_search(query: str, max_results: int = 5) -> ToolResult:
     """
     Synchronous wrapper for tool registry dispatch.
     Executes web search via asyncio event loop safely.
+    The current user is captured here (in the calling thread) so the
+    per-user search cap is charged to the right user even when the search
+    itself runs in a worker thread.
     """
     import asyncio
+    from app.core.user_context import get_current_user
+
+    _u = get_current_user()
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(asyncio.run, execute_web_search(query, max_results)).result()
-        return loop.run_until_complete(execute_web_search(query, max_results))
+                return pool.submit(asyncio.run, execute_web_search(query, max_results, user=_u)).result()
+        return loop.run_until_complete(execute_web_search(query, max_results, user=_u))
     except Exception as e:
         return ToolResult(success=False, error=f"Web search execution failed: {str(e)}")

@@ -50,7 +50,7 @@ def test_mobile_service_worker_served(client):
     sw_code = res.text
 
     # Caches app shell
-    assert "jarvis-mobile-v1" in sw_code
+    assert "jarvis-mobile-v2" in sw_code
     assert "manifest.webmanifest" in sw_code
 
     # Live network for API routes

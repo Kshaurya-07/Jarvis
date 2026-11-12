@@ -94,6 +94,23 @@ class ExtensionService:
 
         _u = resolve_user(user or get_current_user())
         api_key = gemini_api_key or load_user_key(_u)
+        if api_key:
+            # Per-user Gemini cap, same as chat: check (and record) before
+            # creating the client, so page analysis cannot bypass the caps.
+            try:
+                from app.core.usage_limiter import usage_limiter
+                from fastapi import HTTPException
+
+                usage_limiter.check_and_record(_u, kind="gemini")
+            except HTTPException as e:
+                return PageAnalysisResult(
+                    reply=str(e.detail),
+                    mode=mode,
+                    disclosure=disclosure_text,
+                    chars_processed=len(page_text),
+                    success=False,
+                    error="rate_limited",
+                )
         try:
             client = agent_service._get_client(api_key)
         except ValueError as e:

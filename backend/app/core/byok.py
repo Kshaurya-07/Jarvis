@@ -124,12 +124,16 @@ def load_user_key(user: Optional[UserIdentity] = None) -> Optional[str]:
 
 
 def key_status(user: Optional[UserIdentity] = None) -> Dict[str, Any]:
-    """Public key status: has_key + masked hint only. Never the key itself."""
+    """Public key status: has_key + masked hint only. Never the key itself.
+
+    Derived from the meta row alone: one store round trip, no decrypt.
+    A meta row only exists when a key was saved (save writes both, delete
+    removes both), so its presence is the has_key signal.
+    """
     u = resolve_user(user)
     meta = get_user_store().key_meta(u)
-    has_key = get_user_store().load_key(u) is not None
     return {
-        "has_key": has_key,
+        "has_key": meta is not None,
         "hint": meta.get("hint") if meta else None,
         "created_at": meta.get("created_at") if meta else None,
         "valid": None,  # use POST /api/auth/key/validate for a live check

@@ -111,6 +111,7 @@ class ConfirmationManager:
 
     def deny_action(self, confirmation_id: str, user: Optional[Any] = None) -> bool:
         """Deny and cancel a pending action (only its owner may deny)."""
+        self.cleanup_expired()
         action = self._pending.get(confirmation_id)
         if action is not None and user is not None and action.user_sub is not None and action.user_sub != user.sub:
             return False
@@ -120,11 +121,20 @@ class ConfirmationManager:
         return False
 
     def list_pending(self, user: Optional[Any] = None) -> List[PendingAction]:
-        """List currently active pending actions (only the caller's own)."""
+        """List currently active pending actions (only the caller's own).
+
+        Legacy entries (``user_sub=None``) belong to the local owner only:
+        any other signed-in user never sees them.
+        """
         self.cleanup_expired()
         items = [act for act in self._pending.values() if not act.confirmed]
         if user is not None:
-            items = [a for a in items if a.user_sub is None or a.user_sub == user.sub]
+            from app.core.user_context import resolve_user
+
+            if resolve_user(user).is_local_owner:
+                items = [a for a in items if a.user_sub is None or a.user_sub == user.sub]
+            else:
+                items = [a for a in items if a.user_sub == user.sub]
         return items
 
     def cleanup_expired(self) -> None:

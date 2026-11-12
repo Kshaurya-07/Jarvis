@@ -70,10 +70,10 @@ from app.core.session import (
     verify_oauth_state_token,
     verify_session_token,
 )
-from app.core.store import get_user_store
+from app.core.store import get_user_store, memory_enabled_for, set_memory_enabled
 from app.core.user_context import LOCAL_OWNER, UserIdentity, set_current_user
 from app.core.demo_manager import demo_manager
-from app.core.rate_limiter import auth_rate_limiter
+from app.core.rate_limiter import auth_rate_limiter, get_client_ip
 from app.core.remote_auth import remote_session_manager
 from app.core.browser_automation import (
     browser_manager,
@@ -305,6 +305,22 @@ async def health_check() -> HealthResponse:
     )
 
 
+def _require_local_pairing() -> None:
+    """Remote pairing is a local-mode feature: pairing codes and session
+    tokens live only in the laptop's memory, which does not exist (and
+    does not persist) on Vercel. In cloud mode these endpoints are
+    unavailable, not broken — 503 says so plainly."""
+    if settings.CLOUD_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Remote pairing is local mode only: pairing codes and session "
+                "tokens live in the laptop's memory. In cloud mode, sign in "
+                "with Google instead — no pairing is needed."
+            ),
+        )
+
+
 # --- Phase 11 Remote Pairing & Control Endpoints (Tailscale Private Connection) ---
 
 @router.post("/remote/pair/generate", response_model=PairingGenerateResponse, tags=["Remote Pairing"])
@@ -314,6 +330,7 @@ async def generate_pairing_code_endpoint(request: Request) -> PairingGenerateRes
     STRICT SECURITY: Can only be called from loopback/localhost directly on the laptop.
     Rejects remote calls to prevent attackers from generating codes remotely.
     """
+    _require_local_pairing()
     if is_remote_request(request):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -333,7 +350,8 @@ async def exchange_pairing_code_endpoint(req: PairingExchangeRequest, request: R
     Exchange a one-time pairing code for an in-memory revocable session token.
     Enforces rate limits, single-use, and expiration.
     """
-    client_ip = request.client.host if request.client and request.client.host else "127.0.0.1"
+    _require_local_pairing()
+    client_ip = get_client_ip(request)
     session = remote_session_manager.exchange_pairing_code(req.pairing_code, client_ip)
     expires_in = max(1, int(session.expires_at - time.time()))
     return PairingExchangeResponse(
@@ -346,6 +364,7 @@ async def exchange_pairing_code_endpoint(req: PairingExchangeRequest, request: R
 @router.get("/remote/session/status", response_model=SessionStatusResponse, tags=["Remote Pairing"])
 async def session_status_endpoint(request: Request) -> SessionStatusResponse:
     """Check whether the provided session token is currently valid."""
+    _require_local_pairing()
     token = extract_token_from_request(request)
     if not token:
         return SessionStatusResponse(valid=False, detail="No session token provided.")
@@ -360,6 +379,7 @@ async def session_status_endpoint(request: Request) -> SessionStatusResponse:
 @router.post("/remote/session/revoke", response_model=SessionRevokeResponse, tags=["Remote Pairing"])
 async def session_revoke_endpoint(request: Request, _auth: Optional[str] = Depends(require_remote_session)) -> SessionRevokeResponse:
     """Revoke the current session token upon user disconnect."""
+    _require_local_pairing()
     token = extract_token_from_request(request)
     if not token:
         return SessionRevokeResponse(revoked=False, message="No token provided to revoke.")
@@ -375,8 +395,16 @@ async def remote_stop_endpoint(
     request: Request,
     user: UserIdentity = Depends(require_user)
 ) -> RemoteStopResponse:
-    """Halt any in-flight active assistant tasks or operations."""
-    return RemoteStopResponse(stopped=True, message="Active operation aborted promptly.")
+    """Halt any in-flight active assistant tasks or operations.
+
+    Honest answer: there is no mechanism to cancel an in-flight Gemini
+    call in this deployment, so Stop is not supported — this endpoint
+    reports that instead of claiming a successful abort.
+    """
+    return RemoteStopResponse(
+        stopped=False,
+        message="Stop is not supported in this deployment: in-flight requests cannot be cancelled.",
+    )
 
 
 @router.post("/chat", response_model=ChatResponse, tags=["Agent"])
@@ -407,12 +435,27 @@ async def chat_endpoint(
         for t in response.tools_executed
     ]
 
-    return ChatResponse(
+    body = ChatResponse(
         reply=response.message,
         tools_executed=tool_infos,
         success=response.success,
         error=response.error,
     )
+    # Failures that are the caller's problem get real HTTP statuses while
+    # keeping the success:false body for the UI: 400 when the user has no
+    # Gemini key saved, 429 when they hit their usage cap. Transient
+    # Gemini errors stay 200 with success:false, as before.
+    if not response.success and response.error in ("no_user_gemini_key", "rate_limited"):
+        from fastapi.responses import JSONResponse
+
+        status_code = (
+            status.HTTP_400_BAD_REQUEST
+            if response.error == "no_user_gemini_key"
+            else status.HTTP_429_TOO_MANY_REQUESTS
+        )
+        headers = {"Retry-After": "3600"} if response.error == "rate_limited" else None
+        return JSONResponse(status_code=status_code, content=body.model_dump(), headers=headers)
+    return body
 
 
 @router.get("/tools", response_model=List[ToolInfo], tags=["Tools"])
@@ -607,7 +650,7 @@ async def get_memories(user: UserIdentity = Depends(require_user)) -> List[Memor
 @router.post("/memories", response_model=MemoryResponse, status_code=status.HTTP_201_CREATED, tags=["Memory"])
 async def add_or_update_memory(req: MemoryCreateRequest, user: UserIdentity = Depends(require_user)) -> MemoryResponse:
     """Store or update user-approved memory with sensitive credential screening."""
-    if not settings.MEMORY_ENABLED:
+    if not memory_enabled_for(user):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Memory is currently disabled by user setting.",
@@ -655,17 +698,17 @@ async def clear_all_memories(
 async def get_memory_status(user: UserIdentity = Depends(require_user)) -> MemoryStatusResponse:
     """Get memory system status and item count."""
     return MemoryStatusResponse(
-        enabled=settings.MEMORY_ENABLED,
+        enabled=memory_enabled_for(user),
         count=len(get_user_store().list_memories(user)),
     )
 
 
 @router.post("/memories/toggle", response_model=MemoryStatusResponse, tags=["Memory"])
 async def toggle_memory(req: MemoryToggleRequest, user: UserIdentity = Depends(require_user)) -> MemoryStatusResponse:
-    """Enable or disable persistent memory storage."""
-    settings.MEMORY_ENABLED = req.enabled
+    """Enable or disable persistent memory storage for this user only."""
+    set_memory_enabled(user, req.enabled)
     return MemoryStatusResponse(
-        enabled=settings.MEMORY_ENABLED,
+        enabled=memory_enabled_for(user),
         count=len(get_user_store().list_memories(user)),
     )
 
@@ -762,9 +805,9 @@ async def login_callback(
     # exactly where the cookie was set. Same for local dev.
     fail_url = "/mobile/?login=error"
 
-    def _fail(detail: str):
+    def _fail(detail: str, status_code: int = 400):
         if format == "json":
-            return JSONResponse({"detail": detail}, status_code=400)
+            return JSONResponse({"detail": detail}, status_code=status_code)
         return RedirectResponse(url=fail_url, status_code=302)
 
     if error:
@@ -783,7 +826,9 @@ async def login_callback(
         user = UserIdentity(sub=identity["sub"], email=identity.get("email"), name=identity.get("name"))
         token = create_session_token(user)
     except GoogleAuthError as e:
-        return _fail(str(e))
+        # A server-side failure talking to Google (code exchange) is not
+        # the user's fault: 502 for API clients, error redirect for browsers.
+        return _fail(str(e), status_code=502)
     except ValueError as e:
         return _fail(str(e))
     if format == "json":
@@ -809,6 +854,17 @@ async def auth_me(request: Request):
     Google sign-in button."""
     user = _user_from_request(request)
     if user is None:
+        if settings.CLOUD_MODE:
+            # Unauthenticated in cloud mode: never report the local
+            # owner's key status to a stranger.
+            return {
+                "authenticated": False,
+                "email": None,
+                "name": None,
+                "cloud_mode": settings.CLOUD_MODE,
+                "has_key": False,
+                "key_hint": None,
+            }
         status = key_status(LOCAL_OWNER)
         return {
             "authenticated": False,
@@ -1121,15 +1177,15 @@ async def summarize_calendar_endpoint(req: CalendarSummarizeRequest, user: UserI
 @router.get("/browser/approved-domains", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
 async def get_approved_domains(user: UserIdentity = Depends(require_user)) -> ApprovedDomainsResponse:
     """Get the current list of user-approved domains for browser automation."""
-    return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains())
+    return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains(user=user))
 
 
 @router.post("/browser/approve-domain", response_model=ApprovedDomainsResponse, tags=["Browser Automation"])
 async def approve_domain_endpoint(req: ApproveDomainRequest, user: UserIdentity = Depends(require_user)) -> ApprovedDomainsResponse:
     """Explicitly approve a domain for browser automation."""
     try:
-        browser_manager.approve_domain(req.domain)
-        return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains())
+        browser_manager.approve_domain(req.domain, user=user)
+        return ApprovedDomainsResponse(approved_domains=browser_manager.get_approved_domains(user=user))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -1143,8 +1199,8 @@ async def plan_browser_action(req: BrowserPlanActionRequest, user: UserIdentity 
     """
     act = req.action_type.strip().lower()
 
-    # 1. Validate domain
-    if not browser_manager.is_approved(req.approved_domain):
+    # 1. Validate domain (per user)
+    if not browser_manager.is_approved(req.approved_domain, user=user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(

@@ -346,7 +346,7 @@ def test_aq_auth_key_is_scrubbed_from_logs():
 def test_chat_without_key_prompts_for_byok_key(monkeypatch):
     with cloud_client(monkeypatch) as client:
         resp = client.post("/api/chat", json={"message": "hello"}, headers=auth_headers(USER_A))
-        assert resp.status_code == 200
+        assert resp.status_code == 400  # no key: proper 400, success:false body kept
         assert resp.json()["success"] is False
         assert resp.json()["error"] == "no_user_gemini_key"
         assert "Gemini key" in resp.json()["reply"]
