@@ -1,7 +1,5 @@
 # Jarvis — One companion. Every device.
 
-> A cloud-first personal AI assistant. Sign in with Google, bring your own Gemini key, and chat from any device — no install, no localhost, nothing on your laptop.
-
 **Live:** [https://jarvis-kumar-shaurya.vercel.app/](https://jarvis-kumar-shaurya.vercel.app/) — landing page at `/`, the app at `/mobile/`
 
 ## What it is
